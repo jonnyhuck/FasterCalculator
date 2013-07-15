@@ -4,20 +4,19 @@ import java.awt.geom.Point2D;
 
 /**
  * An in-memory patch to be applied to a Writable Raster
- * 
- * Being held in-memory allows for faster editing, but means that this class
- *  is not ideal for holding large amounts of data. The intended purpose of this 
- *  class is for small "patches" of data that may be constructed and then written 
- *  to a WritableRaster on disk.
- * 
+ *
+ * Being held in-memory allows for faster editing, but means that this class is
+ * not ideal for holding large amounts of data. The intended purpose of this
+ * class is for small "patches" of data that may be constructed and then written
+ * to a WritableRaster on disk.
+ *
  * This class is based upon the RasterMap class by Jo Wood in his excellent book
- *  Java Programming for Spatial Sciences.
- * 
+ * Java Programming for Spatial Sciences.
+ *
  * @author jonathan.huck
  */
-
 public class MemoryRasterPatch2D {
-    
+
     /*
      * object variables / raster properties
      */
@@ -25,49 +24,51 @@ public class MemoryRasterPatch2D {
     private double resolution;   //raster resolution
     private int nCols, nRows;    //raster dimensions
     private Point2D origin;      //origin (bottom left)
-    
+
     /**
      * Constructor for a patch with a uniform initial value
+     *
      * @param array1D
      * @param resolution
      * @param nCols
      * @param nRows
-     * @param origin 
+     * @param origin
      */
-    MemoryRasterPatch2D(double initialValue, double resolution, int nCols, 
+    MemoryRasterPatch2D(double initialValue, double resolution, int nCols,
             int nRows, Point2D origin) {
-        
+
         //update proberties to class variables
         this.resolution = resolution;
         this.nCols = nCols;
         this.nRows = nRows;
         this.origin = origin;
-        
+
         //create patch with initial value
-        for (int row = 0; row < this.nRows; row++){
-            for (int col = 0; col < this.nRows; col++){
+        for (int row = 0; row < this.nRows; row++) {
+            for (int col = 0; col < this.nRows; col++) {
                 this.data[row][col] = initialValue;
             }
         }
     }
-    
+
     /**
      * Constructor for a 1D array patch
+     *
      * @param array1D
      * @param resolution
      * @param nCols
      * @param nRows
-     * @param origin 
+     * @param origin
      */
-    MemoryRasterPatch2D(double array1D[], double resolution, int nCols, 
+    MemoryRasterPatch2D(double array1D[], double resolution, int nCols,
             int nRows, Point2D origin) {
-        
+
         //update proberties to object variables
         this.resolution = resolution;
         this.nCols = nCols;
         this.nRows = nRows;
         this.origin = origin;
-        
+
         //populate the data from the one dimensional array
         int row, col;
         for (int i = 0; i < array1D.length; i++) {
@@ -76,18 +77,19 @@ public class MemoryRasterPatch2D {
             this.data[row][col] = array1D[i];
         }
     }
-    
+
     /**
      * Constructor for a 2D array patch
+     *
      * @param array2D
      * @param resolution
      * @param nCols
      * @param nRows
-     * @param origin 
+     * @param origin
      */
-    MemoryRasterPatch2D(double array2D[][], double resolution, 
-            int nCols, int nRows, Point2D origin){
-        
+    MemoryRasterPatch2D(double array2D[][], double resolution,
+            int nCols, int nRows, Point2D origin) {
+
         //update properties and data to object variables
         this.data = array2D;
         this.resolution = resolution;
@@ -95,94 +97,128 @@ public class MemoryRasterPatch2D {
         this.nRows = nRows;
         this.origin = origin;
     }
-    
+
     /**
      * Return the raster value at a given coordinate location
+     *
      * @param x
      * @param y
-     * @return 
+     * @return
      */
     public double getAttribute(long x, long y) {
-        
+
         //get array position
         int col = (int) ((x - origin.getX()) / this.resolution);
         int row = (nRows - 1) - (int) ((y - origin.getY()) / this.resolution);
         return this.data[row][col];
     }
-    
+
     /**
      * Return the raster value at a given coordinate location
+     *
      * @param point
-     * @return 
+     * @return
      */
     public double getAttribute(Point2D point) {
-        
+
         //get array position
         int col = (int) ((point.getX() - origin.getX()) / this.resolution);
         int row = (nRows - 1) - (int) ((point.getY() - origin.getY()) / this.resolution);
         return this.data[row][col];
     }
-    
+
     /**
      * Return the raster value at a given coordinate location
+     *
      * @param x
      * @param y
-     * @return 
+     * @return
      */
     public void setAttribute(long x, long y, double value) {
-        
+
         //get array position
         int col = (int) ((x - origin.getX()) / this.resolution);
         int row = (nRows - 1) - (int) ((y - origin.getY()) / this.resolution);
         this.data[row][col] = value;
     }
-    
+
     /**
      * Return the raster value at a given coordinate location
+     *
      * @param point
-     * @return 
+     * @return
      */
     public void setAttribute(Point2D point, double value) {
-        
+
         //get array position
         int col = (int) ((point.getX() - origin.getX()) / this.resolution);
         int row = (nRows - 1) - (int) ((point.getY() - origin.getY()) / this.resolution);
         this.data[row][col] = value;
     }
-    
+
+    /**
+     * Outputs the data array as a one dimensional array
+     *
+     * @return
+     */
+    public double[] getData1D() {
+
+        //flatten the array and return
+        double[] data1D = new double[nCols * nRows];
+        int row, col;
+        for (int i = 0; i < nCols; i++) {
+            row = (int) i / nRows;
+            col = i % nCols;
+            data1D[i] = this.data[row][col];
+        }
+        return data1D;
+    }
+
     /*
      * accessor methods
      */
-    
     /**
      * Return the resolution of the raster
-     * @return 
+     *
+     * @return
      */
-    public double getResolution(){
+    public double getResolution() {
         return this.resolution;
     }
-    
+
     /**
      * Return the number of rows in the raster
-     * @return 
+     *
+     * @return
      */
-    public int getNRows(){
+    public int getNRows() {
         return this.nRows;
     }
-    
+
     /**
      * Return the number of columns in the raster
-     * @return 
+     *
+     * @return
      */
-    public int getNCols(){
+    public int getNCols() {
         return this.nCols;
     }
-    
+
     /**
      * Return the origin of the raster
-     * @return 
+     *
+     * @return
      */
-    public Point2D getOrigin(){
+    public Point2D getOrigin() {
         return this.origin;
+    }
+
+    /**
+     * Return the data as a 2D array
+     *
+     * @return
+     */
+    public double[][] getData2D() {
+        return this.data;
     }
 }

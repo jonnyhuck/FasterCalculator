@@ -2,11 +2,9 @@ package co.uk.winddirecttools.fastercalculator;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Set;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
-import org.geotools.coverage.grid.io.GridFormatFactorySpi;
 import org.geotools.coverage.grid.io.GridFormatFinder;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.factory.Hints;
@@ -38,22 +36,15 @@ public class App {
 
         try {
 
-            //for debugging purposes
-            Boolean debug = false;
-
-            //display a data store file chooser dialog for images
-            String[] ext = {"asc, tif"};
-            File file = JFileDataStoreChooser.showOpenFile(ext, null);
-            if (file == null) {
+            //display a data store file chooser dialog
+            String[] ext = {"asc", "tif"};
+            File file1 = JFileDataStoreChooser.showOpenFile(ext, null);
+            if (file1 == null) {
                 return;
             }
-
-            //print available file types
-            if (debug) {
-                Set<GridFormatFactorySpi> formats = GridFormatFinder.getAvailableFormats();
-                for (GridFormatFactorySpi format : formats) {
-                    System.out.println(format.toString());
-                }
+            File file2 = JFileDataStoreChooser.showOpenFile(ext, null);
+            if (file2 == null) {
+                return;
             }
 
             //set default crs
@@ -62,9 +53,17 @@ public class App {
             hint.put(Hints.DEFAULT_COORDINATE_REFERENCE_SYSTEM, crs);
 
             //open the raster layer
-            AbstractGridFormat format = GridFormatFinder.findFormat(file);
-            AbstractGridCoverage2DReader reader = format.getReader(file, hint);
-            GridCoverage2D gc = (GridCoverage2D) reader.read(null);
+            AbstractGridFormat format = GridFormatFinder.findFormat(file1);
+            AbstractGridCoverage2DReader reader1 = format.getReader(file1, hint);
+            GridCoverage2D gc1 = (GridCoverage2D) reader1.read(null);
+
+            //open the raster layer
+            AbstractGridCoverage2DReader reader2 = format.getReader(file2, hint);
+            GridCoverage2D gc2 = (GridCoverage2D) reader2.read(null);
+
+            //combine
+            RasterCalculator rc = new RasterCalculator();
+            GridCoverage2D gc = rc.process(gc1, 20000d, gc2, 20000d, RasterCalculator.ADD);
 
             //create greyscale style
             StyleFactory sf = CommonFactoryFinder.getStyleFactory(null);
@@ -78,7 +77,7 @@ public class App {
 
             //create a map context
             MapContext map = new DefaultMapContext();
-            map.setTitle("Faster Calculator 0.1");
+            map.setTitle("WDT \"Faster\" Calculator 0.1");
             map.addLayer(gc, rasterStyle);
 
             // Now display the map
