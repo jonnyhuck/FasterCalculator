@@ -26,7 +26,6 @@ public class MemoryRasterPatch2D {
     private int nCols, nRows;    //raster dimensions
     private Point2D origin;      //origin (bottom left)
     
-    
     /**
      * Constructor for a patch with a uniform initial value
      * @param array1D
@@ -35,7 +34,8 @@ public class MemoryRasterPatch2D {
      * @param nRows
      * @param origin 
      */
-    public void MemoryRasterPatch2D(double initialValue, double resolution, int nCols, int nRows, Point2D origin) {
+    MemoryRasterPatch2D(double initialValue, double resolution, int nCols, 
+            int nRows, Point2D origin) {
         
         //update proberties to class variables
         this.resolution = resolution;
@@ -59,7 +59,8 @@ public class MemoryRasterPatch2D {
      * @param nRows
      * @param origin 
      */
-    public void MemoryRasterPatch2D(double array1D[], double resolution, int nCols, int nRows, Point2D origin) {
+    MemoryRasterPatch2D(double array1D[], double resolution, int nCols, 
+            int nRows, Point2D origin) {
         
         //update proberties to object variables
         this.resolution = resolution;
@@ -84,7 +85,8 @@ public class MemoryRasterPatch2D {
      * @param nRows
      * @param origin 
      */
-    public void MemoryRasterPatch2D(double array2D[][], double resolution, int nCols, int nRows, Point2D origin){
+    MemoryRasterPatch2D(double array2D[][], double resolution, 
+            int nCols, int nRows, Point2D origin){
         
         //update properties and data to object variables
         this.data = array2D;
