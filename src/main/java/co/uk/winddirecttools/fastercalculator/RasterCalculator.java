@@ -73,9 +73,6 @@ public class RasterCalculator {
         raster = applyRasterValues(raster, tmpGc, coverage1, radius1, operation);
         raster = applyRasterValues(raster, tmpGc, coverage2, radius2, operation);
 
-        //dispose of the temporary grid coverage
-        tmpGc.dispose(true);
-
         //convert to grid coverage and return
         return factory.create("output", raster, envelope);
     }
@@ -167,17 +164,17 @@ public class RasterCalculator {
         final GridCoordinates2D sampleOrigin = tmpGc.getGridGeometry().worldToGrid(tl);
 
         //get values from the writable raster
-        double[] existingData = new double[nCells];
+        /*double[] existingData = new double[nCells];
         try {
             raster.getSamples(sampleOrigin.x, sampleOrigin.y, w, h, 0, existingData);
         } catch(ArrayIndexOutOfBoundsException e) {
             System.out.println(sampleOrigin);
-        }
+        }*/
 
         //build a patch (enforcing radius)
         final Point2D origin = new Point2D.Double(gc.getEnvelope2D().getMinX(), gc.getEnvelope2D().getMinY());
-        final double resolution = gc.getEnvelope2D().width / gc.getGridGeometry().getGridRange2D().width;
-        MemoryRasterPatch2D patch = new MemoryRasterPatch2D(0d, resolution,
+        final int resolution = (int) gc.getEnvelope2D().width / gc.getGridGeometry().getGridRange2D().width;
+        MemoryRasterPatch2D patch = new MemoryRasterPatch2D(0, resolution,
                 gc.getGridGeometry().getGridRange2D().width,
                 gc.getGridGeometry().getGridRange2D().height, origin);
 
@@ -201,12 +198,12 @@ public class RasterCalculator {
                 if (centroid.distance(cellLocation.toPoint2D()) < radius) {
 
                     //get the raster and coverage values value for that location
-                    double gcValue = this.getValueFromGridCoverage(cellLocation, gc);
-                    double rasterValue = raster.getSampleDouble((int) cellLocationGrid.x,
+                    int gcValue = this.getValueFromGridCoverage(cellLocation, gc);
+                    int rasterValue = raster.getSample((int) cellLocationGrid.x,
                             (int) cellLocationGrid.y, 0);
-
+                    
                     //perform the necessary operation
-                    double outValue;
+                    int outValue;
                     switch (operation) {
                         case 0:     //add
                             outValue = rasterValue + gcValue;
@@ -231,7 +228,7 @@ public class RasterCalculator {
 
         //apply the patch to the writable raster
         /** TODO - NEED TO GET THIS SORTED +1 IS A TEMP FIX FOR A BUG THAT i THINK COMES FROM GRID ALIGNMENT **/
-        raster.setPixels(sampleOrigin.x + 1, sampleOrigin.y, w, h, patch.getData1D());
+        raster.setSamples(sampleOrigin.x + 1, sampleOrigin.y, w, h, 0, patch.getData1D());
 
         //return it
         return raster;
@@ -246,12 +243,12 @@ public class RasterCalculator {
      * @throws NoSuchAuthorityCodeException
      * @throws FactoryException
      */
-    private double getValueFromGridCoverage(DirectPosition2D point, GridCoverage2D gc)
+    private int getValueFromGridCoverage(DirectPosition2D point, GridCoverage2D gc)
             throws NoSuchAuthorityCodeException, FactoryException {
 
         //get the coverage data
         final DirectPosition position = point;
-        double[] bands = new double[1];
+        int[] bands = new int[1];
         try {
             gc.evaluate(position, bands);
             return bands[0];

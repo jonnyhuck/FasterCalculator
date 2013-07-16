@@ -20,8 +20,8 @@ public class MemoryRasterPatch2D {
     /*
      * object variables / raster properties
      */
-    private double[][] data;     //raster values
-    private double resolution;   //raster resolution
+    private int[][] data;     //raster values
+    private int resolution;   //raster resolution
     private int nCols, nRows;    //raster dimensions
     private Point2D origin;      //origin (bottom left)
 
@@ -34,7 +34,7 @@ public class MemoryRasterPatch2D {
      * @param nRows
      * @param origin
      */
-    MemoryRasterPatch2D(double initialValue, double resolution, int nCols,
+    MemoryRasterPatch2D(int initialValue, int resolution, int nCols,
             int nRows, Point2D origin) {
 
         //update proberties to class variables
@@ -42,7 +42,7 @@ public class MemoryRasterPatch2D {
         this.nCols = nCols;
         this.nRows = nRows;
         this.origin = origin;
-        this.data = new double[nRows][nCols];
+        this.data = new int[nRows][nCols];
 
         //create patch with initial value
         for (int row = 0; row < this.nRows; row++) {
@@ -61,7 +61,7 @@ public class MemoryRasterPatch2D {
      * @param nRows
      * @param origin
      */
-    MemoryRasterPatch2D(double array1D[], double resolution, int nCols,
+    MemoryRasterPatch2D(int array1D[], int resolution, int nCols,
             int nRows, Point2D origin) {
 
         //update proberties to object variables
@@ -69,7 +69,7 @@ public class MemoryRasterPatch2D {
         this.nCols = nCols;
         this.nRows = nRows;
         this.origin = origin;
-        this.data = new double[nRows][nCols];
+        this.data = new int[nRows][nCols];
 
         //populate the data from the one dimensional array
         int row, col;
@@ -89,7 +89,7 @@ public class MemoryRasterPatch2D {
      * @param nRows
      * @param origin
      */
-    MemoryRasterPatch2D(double array2D[][], double resolution,
+    MemoryRasterPatch2D(int array2D[][], int resolution,
             int nCols, int nRows, Point2D origin) {
 
         //update properties and data to object variables
@@ -98,7 +98,7 @@ public class MemoryRasterPatch2D {
         this.nCols = nCols;
         this.nRows = nRows;
         this.origin = origin;
-        this.data = new double[nRows][nCols];
+        this.data = new int[nRows][nCols];
     }
 
     /**
@@ -108,7 +108,7 @@ public class MemoryRasterPatch2D {
      * @param y
      * @return
      */
-    public double getAttribute(long x, long y) {
+    public int getAttribute(long x, long y) {
 
         //get array position
         int col = (int) ((x - origin.getX()) / this.resolution);
@@ -122,7 +122,7 @@ public class MemoryRasterPatch2D {
      * @param point
      * @return
      */
-    public double getAttribute(Point2D point) {
+    public int getAttribute(Point2D point) {
 
         //get array position
         int col = (int) ((point.getX() - origin.getX()) / this.resolution);
@@ -137,7 +137,7 @@ public class MemoryRasterPatch2D {
      * @param y
      * @return
      */
-    public void setAttribute(long x, long y, double value) {
+    public void setAttribute(long x, long y, int value) {
 
         //get array position
         int col = (int) ((x - origin.getX()) / this.resolution);
@@ -151,7 +151,7 @@ public class MemoryRasterPatch2D {
      * @param point
      * @return
      */
-    public void setAttribute(Point2D point, double value) {
+    public void setAttribute(Point2D point, int value) {
 
         //get array position
         int col = (int) ((point.getX() - origin.getX()) / this.resolution);
@@ -164,14 +164,15 @@ public class MemoryRasterPatch2D {
      *
      * @return
      */
-    public double[] getData1D() {
+    public int[] getData1D() {
 
         //flatten the array and return
-        double[] data1D = new double[nCols * nRows];
+        int nCells = this.nRows * this.nCols;
+        int[] data1D = new int[nCells];
         int row, col;
-        for (int i = 0; i < nCols; i++) {
-            row = (int) i / nRows;
-            col = i % nCols;
+        for (int i = 0; i < nCells; i++) {
+            row = (int) i / this.nRows;
+            col = i % this.nCols;
             data1D[i] = this.data[row][col];
         }
         return data1D;
@@ -185,7 +186,7 @@ public class MemoryRasterPatch2D {
      *
      * @return
      */
-    public double getResolution() {
+    public int getResolution() {
         return this.resolution;
     }
 
@@ -221,7 +222,7 @@ public class MemoryRasterPatch2D {
      *
      * @return
      */
-    public double[][] getData2D() {
+    public int[][] getData2D() {
         return this.data;
     }
 }
