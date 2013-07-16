@@ -4,14 +4,17 @@ import java.awt.geom.Point2D;
 import java.awt.image.DataBuffer;
 import java.awt.image.WritableRaster;
 import javax.media.jai.RasterFactory;
+import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
+import org.geotools.coverage.grid.InvalidGridGeometryException;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.Envelope2D;
 import org.geotools.referencing.CRS;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.TransformException;
 
 /**
  * Raster calculator class, performs map algebra without clipping input files
@@ -41,7 +44,7 @@ public class RasterCalculator {
      */
     public GridCoverage2D process(GridCoverage2D coverage1, Double radius1,
             GridCoverage2D coverage2, Double radius2, int operation)
-            throws NoSuchAuthorityCodeException, FactoryException {
+            throws NoSuchAuthorityCodeException, FactoryException, InvalidGridGeometryException, TransformException {
 
         //define coord system
         final CoordinateReferenceSystem crs = CRS.decode("EPSG:27700", true);
@@ -51,18 +54,12 @@ public class RasterCalculator {
                 coverage2.getEnvelope2D(), crs);
         
         //get an empty grid coverage at the correct size
-        WritableRaster raster = getWritableRaster(coverage1, coverage2, 0);
+        WritableRaster raster = getWritableRaster(envelope, coverage1, coverage2, 0);
 
         //apply each input coverage to the writable raster
         raster = applyRasterValues(raster, coverage1, radius1, operation);
-        coverage1.dispose(false);
-        
-        System.out.println("***hereandthere");
 
         raster = applyRasterValues(raster, coverage2, radius2, operation);
-        coverage2.dispose(false);
-        
-        System.out.println("***back again");
 
         //convert to grid coverage and return
         final GridCoverageFactory factory = new GridCoverageFactory();
@@ -78,19 +75,22 @@ public class RasterCalculator {
      * @throws NoSuchAuthorityCodeException
      * @throws FactoryException
      */
-    private WritableRaster getWritableRaster(GridCoverage2D coverage1, GridCoverage2D coverage2,
-            double initialValue)
+    private WritableRaster getWritableRaster(Envelope2D envelope, 
+            GridCoverage2D coverage1, GridCoverage2D coverage2, double initialValue)
             throws NoSuchAuthorityCodeException, FactoryException, ResolutionException {
 
         //verify resolutions match
-        final int pxWidth = (int) coverage1.getGridGeometry().getGridRange2D().getSpan(0);
-        if (pxWidth != coverage2.getGridGeometry().getGridRange2D().getSpan(0)) {
+        final int resolution = (int) coverage1.getEnvelope2D().width / 
+                coverage1.getGridGeometry().getGridRange2D().width;
+        if (resolution != (int) coverage2.getEnvelope2D().width / 
+                coverage2.getGridGeometry().getGridRange2D().width) {
             throw new ResolutionException();
         }
 
         //build a raster to base the size upon
-        final WritableRaster raster = RasterFactory.createBandedRaster(
-                DataBuffer.TYPE_INT, pxWidth, pxWidth, 1, null);
+        WritableRaster raster = RasterFactory.createBandedRaster(
+                DataBuffer.TYPE_INT, (int) (envelope.width / resolution), 
+                (int) (envelope.height / resolution), 1, null);
 
         //populate initial values
         for (int y = 0; y < raster.getHeight(); y++) {
@@ -135,7 +135,7 @@ public class RasterCalculator {
      * @return
      */
     private WritableRaster applyRasterValues(WritableRaster raster, GridCoverage2D gc,
-            Double radius, int operation) {
+            Double radius, int operation) throws InvalidGridGeometryException, TransformException {
 
         //get patch dimensions
         final int w = gc.getGridGeometry().getGridRange2D().width;
@@ -143,32 +143,26 @@ public class RasterCalculator {
         final int nCells = w * h;
 
         //get bottom left coords, then convert to top left
-        final DirectPosition2D bl = (DirectPosition2D) gc.getEnvelope2D().getLowerCorner();
-        final int tlX = (int) bl.x;
-        final int tlY = (int) bl.y + (int) Math.ceil(gc.getEnvelope2D().height);
-
+        final DirectPosition2D tl = new DirectPosition2D(gc.getEnvelope2D().getCoordinateReferenceSystem(), 
+                gc.getEnvelope2D().x, gc.getEnvelope2D().y);
+        final GridCoordinates2D tlGrid = gc.getGridGeometry().worldToGrid(tl);
+        
         //get the centroid coordinates (from which the radius will be enforced)
         final Point2D centroid = new Point2D.Double(gc.getEnvelope2D().getCenterX(),
                 gc.getEnvelope2D().getCenterY());
-
+        
         //get values from the writable raster
         double[] existingData = new double[nCells];
-        raster.getPixels(tlX, tlY, w, h, existingData);
-        
-        
-        System.out.println("***here");
+        raster.getSamples(tlGrid.x, tlGrid.y, w, h, 0, existingData);
 
         //build a patch (enforcing radius)
-        final Point2D origin = new Point2D.Double(gc.getGridGeometry().getEnvelope2D().getMinX(),
-                gc.getGridGeometry().getEnvelope2D().getMaxY());
-        final double resolution = gc.getGridGeometry().getEnvelope2D().width
+        final Point2D origin = new Point2D.Double(gc.getEnvelope2D().getMinX(),
+                gc.getEnvelope2D().getMaxY());
+        final double resolution = gc.getEnvelope2D().width
                 / gc.getGridGeometry().getGridRange2D().width;
         final int nCols = gc.getGridGeometry().getGridRange2D().width;
         final int nRows = gc.getGridGeometry().getGridRange2D().height;
         MemoryRasterPatch2D patch = new MemoryRasterPatch2D(0d, resolution, nCols, nRows, origin);
-
-        
-        System.out.println("***there");
         
         //populate the patch
         for (int row = 0; row < patch.getNRows(); row++) {
@@ -207,7 +201,7 @@ public class RasterCalculator {
         }
 
         //apply the patch to the writable raster
-        raster.setPixels(tlX, tlY, w, h, patch.getData1D());
+        raster.setPixels(tlGrid.x, tlGrid.y, w, h, patch.getData1D());
 
         //return it
         return raster;
