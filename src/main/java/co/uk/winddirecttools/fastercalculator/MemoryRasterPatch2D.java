@@ -42,6 +42,7 @@ public class MemoryRasterPatch2D {
         this.nCols = nCols;
         this.nRows = nRows;
         this.origin = origin;
+        this.data = new double[nRows][nCols];
 
         //create patch with initial value
         for (int row = 0; row < this.nRows; row++) {
@@ -68,6 +69,7 @@ public class MemoryRasterPatch2D {
         this.nCols = nCols;
         this.nRows = nRows;
         this.origin = origin;
+        this.data = new double[nRows][nCols];
 
         //populate the data from the one dimensional array
         int row, col;
@@ -96,6 +98,7 @@ public class MemoryRasterPatch2D {
         this.nCols = nCols;
         this.nRows = nRows;
         this.origin = origin;
+        this.data = new double[nRows][nCols];
     }
 
     /**
