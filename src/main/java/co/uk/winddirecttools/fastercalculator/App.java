@@ -47,21 +47,22 @@ public class App {
         try {
 
             //take in files
-            File file1 = JFileDataStoreChooser.showOpenFile("asc", null);
+            String[] ext = {"asc", "tif"};
+            File file1 = JFileDataStoreChooser.showOpenFile(ext, null);
             if (file1 == null) {
                 return;
             }
-            File file2 = JFileDataStoreChooser.showOpenFile("asc", null);
+            File file2 = JFileDataStoreChooser.showOpenFile(ext, null);
             if (file2 == null) {
                 return;
             }
 
             //get output path
+            String outPath;
             JFileChooser chooser = new JFileChooser();
             FileNameExtensionFilter filter = new FileNameExtensionFilter("GeoTiff Files", "tif");
             chooser.setFileFilter(filter);
             int returnVal = chooser.showSaveDialog(null);
-            String outPath;
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 outPath = chooser.getSelectedFile().getAbsolutePath();
             } else {
