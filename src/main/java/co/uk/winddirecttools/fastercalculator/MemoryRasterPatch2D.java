@@ -46,7 +46,7 @@ public class MemoryRasterPatch2D {
 
         //create patch with initial value
         for (int row = 0; row < this.nRows; row++) {
-            for (int col = 0; col < this.nRows; col++) {
+            for (int col = 0; col < this.nCols; col++) {
                 this.data[row][col] = initialValue;
             }
         }

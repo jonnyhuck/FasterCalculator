@@ -2,7 +2,6 @@ package co.uk.winddirecttools.fastercalculator;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JFileChooser;
@@ -12,18 +11,32 @@ import org.geotools.coverage.grid.InvalidGridGeometryException;
 import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.coverage.grid.io.GridFormatFinder;
+import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.factory.Hints;
 import org.geotools.gce.geotiff.GeoTiffWriter;
+import org.geotools.map.DefaultMapContext;
+import org.geotools.map.MapContext;
 import org.geotools.referencing.CRS;
+import org.geotools.styling.ChannelSelection;
+import org.geotools.styling.ContrastEnhancement;
+import org.geotools.styling.RasterSymbolizer;
+import org.geotools.styling.SLD;
+import org.geotools.styling.SelectedChannelType;
+import org.geotools.styling.Style;
+import org.geotools.styling.StyleFactory;
+import org.geotools.swing.JMapFrame;
+import org.geotools.swing.data.JFileDataStoreChooser;
+import org.opengis.filter.FilterFactory2;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.TransformException;
+import org.opengis.style.ContrastMethod;
 
 /**
  * Class for the application itself
  */
-public class App {
+public class App_1 {
 
     /**
      * Main method for the app
@@ -33,30 +46,15 @@ public class App {
     public static void main(String[] args) {
         try {
 
-            //get input directory path
-            String inPath;
-            JFileChooser inChooser = new JFileChooser();
-            inChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-            int inReturnVal = inChooser.showOpenDialog(inChooser);
-            if (inReturnVal == JFileChooser.APPROVE_OPTION) {
-                inPath = inChooser.getSelectedFile().getAbsolutePath();
-            } else {
+            //take in files
+            String[] ext = {"asc", "tif"};
+            File file1 = JFileDataStoreChooser.showOpenFile(ext, null);
+            if (file1 == null) {
                 return;
             }
-
-            //get list of files
-            String fileName;
-            File folder = new File(inPath);
-            File[] listOfFiles = folder.listFiles();
-            ArrayList<File> filesToProcess = new ArrayList<File>();
-            for (int i = 0; i < listOfFiles.length; i++) {
-                fileName = listOfFiles[i].getName();
-                if (listOfFiles[i].isFile()) {
-                    if (fileName.endsWith(".asc") || fileName.endsWith(".ASC")
-                            || fileName.endsWith(".tif") || fileName.endsWith(".TIF")) {
-                        filesToProcess.add(listOfFiles[i]);
-                    }
-                }
+            File file2 = JFileDataStoreChooser.showOpenFile(ext, null);
+            if (file2 == null) {
+                return;
             }
 
             //get output file path
@@ -70,38 +68,43 @@ public class App {
             } else {
                 return;
             }
-
+            
             //set default crs
             CoordinateReferenceSystem crs = CRS.decode("EPSG:27700", true);
             final Hints hint = new Hints();
             hint.put(Hints.DEFAULT_COORDINATE_REFERENCE_SYSTEM, crs);
 
-            //get first File
-            File firstFile = filesToProcess.remove(0);
-            System.out.println("processing..." + firstFile.getName());
-
-            //open the raster layer
-            AbstractGridFormat format = GridFormatFinder.findFormat(firstFile);
-            AbstractGridCoverage2DReader reader1 = format.getReader(firstFile, hint);
+            //open the raster layers
+            AbstractGridFormat format = GridFormatFinder.findFormat(file1);
+            AbstractGridCoverage2DReader reader1 = format.getReader(file1, hint);
             GridCoverage2D gc1 = (GridCoverage2D) reader1.read(null);
+            AbstractGridCoverage2DReader reader2 = format.getReader(file2, hint);
+            GridCoverage2D gc2 = (GridCoverage2D) reader2.read(null);
 
-            //combine the layers
-            for (File file : filesToProcess) {
-
-                //read the next file
-                System.out.println("processing..." + file.getName());
-                format = GridFormatFinder.findFormat(file);
-                AbstractGridCoverage2DReader reader2 = format.getReader(file, hint);
-                GridCoverage2D gc2 = (GridCoverage2D) reader2.read(null);
-
-                //combine
-                RasterCalculator rc = new RasterCalculator();
-                gc1 = rc.process(gc1, 20000d, gc2, 20000d, RasterCalculator.ADD);
-            }
+            //combine
+            RasterCalculator rc = new RasterCalculator();
+            GridCoverage2D gc = rc.process(gc1, 20000d, gc2, 20000d, RasterCalculator.ADD);
 
             //write result
-            writeGeoTiffFile(gc1, outPath);
-            System.out.println("Done!");
+            writeGeoTiffFile(gc, outPath);
+
+            //create greyscale style
+            StyleFactory sf = CommonFactoryFinder.getStyleFactory(null);
+            FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2(null);
+            ContrastEnhancement ce = sf.contrastEnhancement(ff.literal(1.0), ContrastMethod.HISTOGRAM);
+            SelectedChannelType sct = sf.createSelectedChannelType(String.valueOf(1), ce);
+            RasterSymbolizer sym = sf.getDefaultRasterSymbolizer();
+            ChannelSelection sel = sf.channelSelection(sct);
+            sym.setChannelSelection(sel);
+            Style rasterStyle = SLD.wrapSymbolizers(sym);
+
+            //create a map context
+            MapContext map = new DefaultMapContext();
+            map.setTitle("WDT \"Faster\" Calculator 0.1");
+            map.addLayer(gc, rasterStyle);
+
+            // Now display the map
+            JMapFrame.showMap(map);
 
         } catch (InvalidGridGeometryException ex) {
             Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);

@@ -1,5 +1,6 @@
 package co.uk.winddirecttools.fastercalculator;
 
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.image.DataBuffer;
 import java.awt.image.WritableRaster;
@@ -19,7 +20,7 @@ import org.opengis.referencing.operation.TransformException;
 
 /**
  * Raster calculator class, performs map algebra without clipping input files
- *
+ * 
  * @author jonathan.huck
  */
 public class RasterCalculator {
@@ -50,18 +51,18 @@ public class RasterCalculator {
         //define coord system
         final CoordinateReferenceSystem crs = coverage1.getCoordinateReferenceSystem();
 
-        //get the dimensions of the output
-        final Envelope2D envelope = getCombinedEnvelope(coverage1.getEnvelope2D(),
-                coverage2.getEnvelope2D(), crs);
-
         //verify resolutions match
-        final int resolution = (int) coverage1.getEnvelope2D().width
-                / coverage1.getGridGeometry().getGridRange2D().width;
-        if (resolution != (int) coverage2.getEnvelope2D().width
-                / coverage2.getGridGeometry().getGridRange2D().width) {
+        int resolution = this.getResolution(coverage1)[0];
+        int resolution2 = this.getResolution(coverage2)[0];
+        
+        if (resolution != resolution2) {
             throw new ResolutionException();
         }
 
+        //get the dimensions of the output
+        final Envelope2D envelope = getCombinedEnvelope(coverage1.getEnvelope2D(),
+                coverage2.getEnvelope2D(), resolution, crs);
+        
         //get an empty grid coverage at the correct size
         WritableRaster raster = getWritableRaster(envelope, resolution, 0);
 
@@ -87,7 +88,7 @@ public class RasterCalculator {
      * @return
      */
     private Envelope2D getCombinedEnvelope(Envelope2D envelope1, Envelope2D envelope2,
-            CoordinateReferenceSystem crs) {
+            int resolution, CoordinateReferenceSystem crs) {
 
         //get corners
         final Double maxX = Math.max(envelope1.getMaxX(), envelope2.getMaxX());
@@ -95,9 +96,13 @@ public class RasterCalculator {
         final Double minX = Math.min(envelope1.getMinX(), envelope2.getMinX());
         final Double minY = Math.min(envelope1.getMinY(), envelope2.getMinY());
 
-        //get anchor points
-        final DirectPosition2D bl = new DirectPosition2D(crs, minX, minY);
-        final DirectPosition2D tr = new DirectPosition2D(crs, maxX, maxY);
+        //get anchor points (aligns to grid by buffering outwards)
+        final DirectPosition2D bl = new DirectPosition2D(crs, 
+                Math.floor(minX / resolution) * resolution, 
+                Math.floor(minY / resolution) * resolution);
+        final DirectPosition2D tr = new DirectPosition2D(crs, 
+                Math.ceil(maxX / resolution) * resolution, 
+                Math.ceil(maxY / resolution) * resolution);
 
         //build new envelope
         return new Envelope2D(bl, tr);
@@ -227,8 +232,10 @@ public class RasterCalculator {
         }
 
         //apply the patch to the writable raster
-        /** TODO - NEED TO GET THIS SORTED +1 IS A TEMP FIX FOR A BUG THAT i THINK COMES FROM GRID ALIGNMENT **/
-        raster.setSamples(sampleOrigin.x + 1, sampleOrigin.y, w, h, 0, patch.getData1D());
+        raster.setSamples(sampleOrigin.x, sampleOrigin.y, w, h, 0, patch.getData1D());
+        
+        //clean up
+        patch = null;
 
         //return it
         return raster;
@@ -257,5 +264,17 @@ public class RasterCalculator {
             System.out.println(e.getOffendingLocation());
             return 0;
         }
+    }
+    
+    /**
+     * Returns the resolution of a Grid Coverage
+     * @param gc
+     * @return 
+     */
+    private int[] getResolution(GridCoverage2D gc) {
+        //get the resolution
+        AffineTransform gridToCRS = (AffineTransform) gc.getGridGeometry().getGridToCRS2D();
+        int[] scale = {(int) Math.round(gridToCRS.getScaleX()), (int) Math.round(gridToCRS.getScaleY())};
+        return scale;
     }
 }
