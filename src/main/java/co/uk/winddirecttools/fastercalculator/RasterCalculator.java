@@ -79,7 +79,7 @@ public class RasterCalculator {
     private int[] getResolution(GridCoverage2D gc) {
         //get the resolution
         AffineTransform gridToCRS = (AffineTransform) gc.getGridGeometry().getGridToCRS2D();
-        int[] scale = {(int) Math.round(gridToCRS.getScaleX()), (int) Math.round(gridToCRS.getScaleY())};
+        final int[] scale = {(int) Math.round(gridToCRS.getScaleX()), (int) Math.round(gridToCRS.getScaleY())};
         return scale;
     }
 
@@ -174,36 +174,39 @@ public class RasterCalculator {
             throws InvalidGridGeometryException, TransformException,
             NoSuchAuthorityCodeException, FactoryException {
 
+        //details required for converting coordinates to grid positions on the output raster
+        final GridGeometry2D rasterGrid = tmpGc.getGridGeometry();
+
+        System.out.println(rasterGrid.getGridRange2D().getMinX());
+        System.out.println(rasterGrid.getGridRange2D().getMaxX());
+        System.out.println(rasterGrid.getGridRange2D().getMinY());
+        System.out.println(rasterGrid.getGridRange2D().getMaxY());
 
         //loop through each coverage and add to raster
         for (GridCoverage2D coverage : coverages) {
 
-            //get the grid values
-            Envelope2D coverageEnvelope = coverage.getEnvelope2D();
-            GridGeometry2D rasterGrid = tmpGc.getGridGeometry();
-            GridEnvelope2D coverageGridEnvelope = rasterGrid.worldToGrid(coverageEnvelope);
+            //get the grid values for the coverage
+            final Envelope2D coverageEnvelope = coverage.getEnvelope2D();
+            final GridEnvelope2D coverageGridEnvelope = rasterGrid.worldToGrid(coverageEnvelope);
 
             System.out.println("**");
-            System.out.println(coverageEnvelope.getBounds2D());
-            System.out.println("**");
-
-            System.out.println(coverageGridEnvelope.x);
-            System.out.println(coverageGridEnvelope.y);
-            System.out.println(coverageGridEnvelope.width);
-            System.out.println(coverageGridEnvelope.height);
+            System.out.println(coverageGridEnvelope.getMinX());
+            System.out.println(coverageGridEnvelope.getMaxX());
+            System.out.println(coverageGridEnvelope.getMinY());
+            System.out.println(coverageGridEnvelope.getMaxY());
 
             //get values from coverage
-            int gcValues[] = this.getValuesFromGridCoverage(coverage);
+            final int gcValues[] = this.getValuesFromGridCoverage(coverage);
 
             //get values from raster
-            int rasterValues[] = new int[0];
-            raster.getSamples(coverageGridEnvelope.x, coverageGridEnvelope.y,
-                    coverageGridEnvelope.width, coverageGridEnvelope.height, 0, rasterValues);
+            int rasterValues[] = new int[(int) coverageGridEnvelope.getWidth() * (int) coverageGridEnvelope.getHeight()];
+            raster.getSamples((int) coverageGridEnvelope.getMinX(), (int) coverageGridEnvelope.getMaxY(),
+                    (int) coverageGridEnvelope.getWidth(), (int) coverageGridEnvelope.getHeight(), 0, rasterValues);
 
-            int values[] = this.operate(operation, gcValues, rasterValues);
+            final int values[] = this.operate(operation, gcValues, rasterValues);
 
             //apply to the raster
-            raster.setSamples(coverageGridEnvelope.x, coverageGridEnvelope.y,
+            raster.setSamples((int) coverageGridEnvelope.getMinX(), (int) coverageGridEnvelope.getMaxY(),
                     coverageGridEnvelope.width, coverageGridEnvelope.height, 0, values);
 
             //destroy coverage
@@ -229,31 +232,22 @@ public class RasterCalculator {
     private int[] getValuesFromGridCoverage(GridCoverage2D gc) {
 
         //get image and iterator
-        RenderedImage img = gc.getRenderedImage();
-        RectIter iter = RectIterFactory.create(img, null);
+        final RenderedImage img = gc.getRenderedImage();
+        final RectIter iter = RectIterFactory.create(img, null);
 
         //holder for data
         int[] list = new int[gc.getGridGeometry().getGridRange2D().height
                 * gc.getGridGeometry().getGridRange2D().width];
 
-        try {
-            //each row & column
-            int i = 0;
-            while (!iter.nextLineDone()) {
-                while (!iter.nextPixelDone()) {
-
-                    //get the coverage data
-                    list[i] = iter.getSample(0);
-                    i++;
-                }
+        //get data from each row & column
+        int i = 0;
+        while (!iter.nextLineDone()) {
+            while (!iter.nextPixelDone()) {
+                list[i] = iter.getSample(0);
+                i++;
             }
-
-            //convert to array and return
-            return list;
-        } finally {
-            iter = null;
-            list = null;
         }
+        return list;
     }
 
     /**
@@ -272,28 +266,30 @@ public class RasterCalculator {
         if (one.length == two.length) {
 
             //for output
-            int[] out = new int[0];
+            int[] out = new int[one.length];
 
             //apply the required operation
             switch (operation) {
-                case 1:
+                case 0:
                     out = opAdd(one, two);
                     break;
-                case 2:
+                case 1:
                     out = opSubtract(one, two);
                     break;
-                case 3:
+                case 2:
                     out = opMultiply(one, two);
                     break;
-                case 4:
+                case 3:
                     out = opDivide(one, two);
                     break;
                 default:
-                    throw new UnsupportedOperationException("RasterCalculator does not currently support that operation");
+                    throw new UnsupportedOperationException(
+                            "RasterCalculator does not currently support that operation");
             }
             return out;
         } else {
-            throw new ArrayIndexOutOfBoundsException("Arrays used in operation must be the same size!");
+            throw new ArrayIndexOutOfBoundsException(
+                    "Arrays used in a RasterCalculator operation must be the same size!");
         }
     }
 
@@ -305,7 +301,7 @@ public class RasterCalculator {
      * @return
      */
     private int[] opAdd(int[] one, int[] two) {
-        int[] out = new int[0];
+        int[] out = new int[one.length];
         for (int i = 0; i < one.length; i++) {
             out[i] = one[i] + two[i];
         }
@@ -320,7 +316,7 @@ public class RasterCalculator {
      * @return
      */
     private int[] opSubtract(int[] one, int[] two) {
-        int[] out = new int[0];
+        int[] out = new int[one.length];
         for (int i = 0; i < one.length; i++) {
             out[i] = one[i] - two[i];
         }
@@ -335,7 +331,7 @@ public class RasterCalculator {
      * @return
      */
     private int[] opMultiply(int[] one, int[] two) {
-        int[] out = new int[0];
+        int[] out = new int[one.length];
         for (int i = 0; i < one.length; i++) {
             out[i] = one[i] * two[i];
         }
@@ -350,7 +346,7 @@ public class RasterCalculator {
      * @return
      */
     private int[] opDivide(int[] one, int[] two) {
-        int[] out = new int[0];
+        int[] out = new int[one.length];
         for (int i = 0; i < one.length; i++) {
             out[i] = one[i] / two[i];
         }
