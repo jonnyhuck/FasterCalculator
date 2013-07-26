@@ -1,18 +1,20 @@
 package co.uk.winddirecttools.fastercalculator;
 
 import java.awt.geom.AffineTransform;
-import java.awt.geom.Point2D;
 import java.awt.image.DataBuffer;
+import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
+import java.util.ArrayList;
 import javax.media.jai.RasterFactory;
-import org.geotools.coverage.grid.GridCoordinates2D;
+import javax.media.jai.iterator.RectIter;
+import javax.media.jai.iterator.RectIterFactory;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
+import org.geotools.coverage.grid.GridEnvelope2D;
+import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.grid.InvalidGridGeometryException;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.Envelope2D;
-import org.opengis.coverage.PointOutsideCoverageException;
-import org.opengis.geometry.DirectPosition;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
@@ -20,7 +22,7 @@ import org.opengis.referencing.operation.TransformException;
 
 /**
  * Raster calculator class, performs map algebra without clipping input files
- * 
+ *
  * @author jonathan.huck
  */
 public class RasterCalculator {
@@ -44,41 +46,43 @@ public class RasterCalculator {
      * @throws NoSuchAuthorityCodeException
      * @throws FactoryException
      */
-    public GridCoverage2D process(GridCoverage2D coverage1, Double radius1,
-            GridCoverage2D coverage2, Double radius2, int operation)
+    public GridCoverage2D process(ArrayList<GridCoverage2D> coverages, int operation)
             throws NoSuchAuthorityCodeException, FactoryException, InvalidGridGeometryException, TransformException {
 
-        //define coord system
-        final CoordinateReferenceSystem crs = coverage1.getCoordinateReferenceSystem();
-
-        //verify resolutions match
-        int resolution = this.getResolution(coverage1)[0];
-        int resolution2 = this.getResolution(coverage2)[0];
-        
-        if (resolution != resolution2) {
-            throw new ResolutionException();
-        }
+        //define coord system and 
+        final CoordinateReferenceSystem crs = coverages.get(0).getCoordinateReferenceSystem();
+        final int resolution = this.getResolution(coverages.get(0))[0];
 
         //get the dimensions of the output
-        final Envelope2D envelope = getCombinedEnvelope(coverage1.getEnvelope2D(),
-                coverage2.getEnvelope2D(), resolution, crs);
-        
+        final Envelope2D envelope = getCombinedEnvelope(coverages, resolution, crs);
+
         //get an empty grid coverage at the correct size
         WritableRaster raster = getWritableRaster(envelope, resolution, 0);
 
         //build a grid coverage for calculations
         final GridCoverageFactory factory = new GridCoverageFactory();
-        final GridCoverage2D tmpGc = factory.create("output", raster, envelope);
+        final GridCoverage2D tmpGc = factory.create("tmp", raster, envelope);
 
         //apply each input coverage to the writable raster
-        raster = applyRasterValues(raster, tmpGc, coverage1, radius1, operation);
-        raster = applyRasterValues(raster, tmpGc, coverage2, radius2, operation);
+        raster = applyRasterValues(coverages, raster, tmpGc, operation);
 
         //convert to grid coverage and return
         return factory.create("output", raster, envelope);
     }
 
-    
+    /**
+     * Returns the resolution of a Grid Coverage
+     *
+     * @param gc
+     * @return
+     */
+    private int[] getResolution(GridCoverage2D gc) {
+        //get the resolution
+        AffineTransform gridToCRS = (AffineTransform) gc.getGridGeometry().getGridToCRS2D();
+        int[] scale = {(int) Math.round(gridToCRS.getScaleX()), (int) Math.round(gridToCRS.getScaleY())};
+        return scale;
+    }
+
     /**
      * Combine two envelopes into one
      *
@@ -87,28 +91,42 @@ public class RasterCalculator {
      * @param crs
      * @return
      */
-    private Envelope2D getCombinedEnvelope(Envelope2D envelope1, Envelope2D envelope2,
+    private Envelope2D getCombinedEnvelope(ArrayList<GridCoverage2D> coverages,
             int resolution, CoordinateReferenceSystem crs) {
 
+        //get first coverage and set initial dimensions
+        GridCoverage2D gc = coverages.remove(0);
+
         //get corners
-        final Double maxX = Math.max(envelope1.getMaxX(), envelope2.getMaxX());
-        final Double maxY = Math.max(envelope1.getMaxY(), envelope2.getMaxY());
-        final Double minX = Math.min(envelope1.getMinX(), envelope2.getMinX());
-        final Double minY = Math.min(envelope1.getMinY(), envelope2.getMinY());
+        double maxX = gc.getEnvelope2D().getMaxX();
+        double maxY = gc.getEnvelope2D().getMaxY();
+        double minX = gc.getEnvelope2D().getMinX();
+        double minY = gc.getEnvelope2D().getMinY();
+
+        //loop through all coverages and grow envelope as required
+        for (GridCoverage2D coverage : coverages) {
+            maxX = Math.max(maxX, coverage.getEnvelope2D().getMaxX());
+            maxY = Math.max(maxY, coverage.getEnvelope2D().getMaxY());
+            minX = Math.min(minX, coverage.getEnvelope2D().getMinX());
+            minY = Math.min(minY, coverage.getEnvelope2D().getMinY());
+            coverage.dispose(true); //clean up
+        }
 
         //get anchor points (aligns to grid by buffering outwards)
-        final DirectPosition2D bl = new DirectPosition2D(crs, 
-                Math.floor(minX / resolution) * resolution, 
+        final DirectPosition2D bl = new DirectPosition2D(crs,
+                Math.floor(minX / resolution) * resolution,
                 Math.floor(minY / resolution) * resolution);
-        final DirectPosition2D tr = new DirectPosition2D(crs, 
-                Math.ceil(maxX / resolution) * resolution, 
+        final DirectPosition2D tr = new DirectPosition2D(crs,
+                Math.ceil(maxX / resolution) * resolution,
                 Math.ceil(maxY / resolution) * resolution);
+
+        //clean up
+        gc.dispose(true);
 
         //build new envelope
         return new Envelope2D(bl, tr);
     }
-    
-    
+
     /**
      * Returns an empty grid coverage upon which to build results
      *
@@ -118,15 +136,14 @@ public class RasterCalculator {
      * @throws NoSuchAuthorityCodeException
      * @throws FactoryException
      */
-    private WritableRaster getWritableRaster(Envelope2D envelope, double resolution, 
-            double initialValue)
+    private WritableRaster getWritableRaster(Envelope2D envelope, double resolution, double initialValue)
             throws NoSuchAuthorityCodeException, FactoryException, ResolutionException {
 
         //build a raster to base the size upon
         WritableRaster raster = RasterFactory.createBandedRaster(
                 DataBuffer.TYPE_INT, (int) Math.ceil(envelope.getWidth() / resolution),
                 (int) Math.ceil(envelope.getHeight() / resolution), 1, null);
-        
+
         //populate initial values
         for (int y = 0; y < raster.getHeight(); y++) {
             for (int x = 0; x < raster.getWidth(); x++) {
@@ -135,7 +152,6 @@ public class RasterCalculator {
         }
         return raster;
     }
-
 
     /**
      * Adds a set of values from a grid coverage to a writable raster
@@ -150,94 +166,54 @@ public class RasterCalculator {
      * @throws NoSuchAuthorityCodeException
      * @throws FactoryException
      */
-    private WritableRaster applyRasterValues(WritableRaster raster, GridCoverage2D tmpGc,
-            GridCoverage2D gc, Double radius, int operation)
+    private WritableRaster applyRasterValues(
+            ArrayList<GridCoverage2D> coverages,
+            WritableRaster raster,
+            GridCoverage2D tmpGc,
+            int operation)
             throws InvalidGridGeometryException, TransformException,
             NoSuchAuthorityCodeException, FactoryException {
 
-        //get coordinate reference system
-        CoordinateReferenceSystem crs = gc.getEnvelope2D().getCoordinateReferenceSystem();
 
-        //get patch dimensions (same as the coverage)
-        final int w = gc.getGridGeometry().getGridRange2D().width;
-        final int h = gc.getGridGeometry().getGridRange2D().height;
-        final int nCells = w * h;
+        //loop through each coverage and add to raster
+        for (GridCoverage2D coverage : coverages) {
 
-        //get top left coord, and transform to grid
-        final DirectPosition2D tl = new DirectPosition2D(crs,
-                gc.getEnvelope2D().getMinX(), gc.getEnvelope2D().getMaxY());
-        final GridCoordinates2D sampleOrigin = tmpGc.getGridGeometry().worldToGrid(tl);
+            //get the grid values
+            Envelope2D coverageEnvelope = coverage.getEnvelope2D();
+            GridGeometry2D rasterGrid = tmpGc.getGridGeometry();
+            GridEnvelope2D coverageGridEnvelope = rasterGrid.worldToGrid(coverageEnvelope);
 
-        //get values from the writable raster
-        /*double[] existingData = new double[nCells];
-        try {
-            raster.getSamples(sampleOrigin.x, sampleOrigin.y, w, h, 0, existingData);
-        } catch(ArrayIndexOutOfBoundsException e) {
-            System.out.println(sampleOrigin);
-        }*/
+            System.out.println("**");
+            System.out.println(coverageEnvelope.getBounds2D());
+            System.out.println("**");
 
-        //build a patch (enforcing radius)
-        final Point2D origin = new Point2D.Double(gc.getEnvelope2D().getMinX(), gc.getEnvelope2D().getMinY());
-        final int resolution = (int) gc.getEnvelope2D().width / gc.getGridGeometry().getGridRange2D().width;
-        MemoryRasterPatch2D patch = new MemoryRasterPatch2D(0, resolution,
-                gc.getGridGeometry().getGridRange2D().width,
-                gc.getGridGeometry().getGridRange2D().height, origin);
+            System.out.println(coverageGridEnvelope.x);
+            System.out.println(coverageGridEnvelope.y);
+            System.out.println(coverageGridEnvelope.width);
+            System.out.println(coverageGridEnvelope.height);
 
-        //get the centroid coordinates (from which the radius will be enforced)
-        final Point2D centroid = new Point2D.Double(gc.getEnvelope2D().getCenterX(),
-                gc.getEnvelope2D().getCenterY());
+            //get values from coverage
+            int gcValues[] = this.getValuesFromGridCoverage(coverage);
 
-        //populate the patch (loop through each cell)
-        DirectPosition2D cellLocation;
-        GridCoordinates2D cellLocationGrid;
-        for (int row = 0; row < patch.getNRows(); row++) {
-            for (int col = 0; col < patch.getNCols(); col++) {
+            //get values from raster
+            int rasterValues[] = new int[0];
+            raster.getSamples(coverageGridEnvelope.x, coverageGridEnvelope.y,
+                    coverageGridEnvelope.width, coverageGridEnvelope.height, 0, rasterValues);
 
-                cellLocation = new DirectPosition2D(crs,
-                        patch.getOrigin().getX() + (resolution * col),
-                        patch.getOrigin().getY() + (resolution * row));
+            int values[] = this.operate(operation, gcValues, rasterValues);
 
-                cellLocationGrid = gc.getGridGeometry().worldToGrid(cellLocation);
+            //apply to the raster
+            raster.setSamples(coverageGridEnvelope.x, coverageGridEnvelope.y,
+                    coverageGridEnvelope.width, coverageGridEnvelope.height, 0, values);
 
-                //verify that the position is within the radius
-                if (centroid.distance(cellLocation.toPoint2D()) < radius) {
-
-                    //get the raster and coverage values value for that location
-                    int gcValue = this.getValueFromGridCoverage(cellLocation, gc);
-                    int rasterValue = raster.getSample((int) cellLocationGrid.x,
-                            (int) cellLocationGrid.y, 0);
-                    
-                    //perform the necessary operation
-                    int outValue;
-                    switch (operation) {
-                        case 0:     //add
-                            outValue = rasterValue + gcValue;
-                            break;
-                        case 1:     //subtract
-                            outValue = rasterValue - gcValue;
-                            break;
-                        case 2:     //multiply
-                            outValue = rasterValue * gcValue;
-                            break;
-                        case 3:     //divide
-                            outValue = rasterValue / gcValue;
-                            break;
-                        default:    //other number returned...
-                            throw new UnsupportedOperationException();
-                    }
-                    //update the raster
-                    patch.setAttribute(cellLocation.toPoint2D(), outValue);
-                }
-            }
+            //destroy coverage
+            coverage.dispose(true);
         }
 
-        //apply the patch to the writable raster
-        raster.setSamples(sampleOrigin.x, sampleOrigin.y, w, h, 0, patch.getData1D());
-        
-        //clean up
-        patch = null;
+        //destroy tmp coverage
+        tmpGc.dispose(true);
 
-        //return it
+        //return the finished raster
         return raster;
     }
 
@@ -250,31 +226,134 @@ public class RasterCalculator {
      * @throws NoSuchAuthorityCodeException
      * @throws FactoryException
      */
-    private int getValueFromGridCoverage(DirectPosition2D point, GridCoverage2D gc)
-            throws NoSuchAuthorityCodeException, FactoryException {
+    private int[] getValuesFromGridCoverage(GridCoverage2D gc) {
 
-        //get the coverage data
-        final DirectPosition position = point;
-        int[] bands = new int[1];
+        //get image and iterator
+        RenderedImage img = gc.getRenderedImage();
+        RectIter iter = RectIterFactory.create(img, null);
+
+        //holder for data
+        int[] list = new int[gc.getGridGeometry().getGridRange2D().height
+                * gc.getGridGeometry().getGridRange2D().width];
+
         try {
-            gc.evaluate(position, bands);
-            return bands[0];
-        } catch (PointOutsideCoverageException e) {
-            //if the point is not withi the weighting data
-            System.out.println(e.getOffendingLocation());
-            return 0;
+            //each row & column
+            int i = 0;
+            while (!iter.nextLineDone()) {
+                while (!iter.nextPixelDone()) {
+
+                    //get the coverage data
+                    list[i] = iter.getSample(0);
+                    i++;
+                }
+            }
+
+            //convert to array and return
+            return list;
+        } finally {
+            iter = null;
+            list = null;
         }
     }
-    
+
     /**
-     * Returns the resolution of a Grid Coverage
-     * @param gc
-     * @return 
+     * Execute the selected operation upon two int arrays
+     *
+     * @param operation
+     * @param one
+     * @param two
+     * @return
+     * @throws UnsupportedOperationException
      */
-    private int[] getResolution(GridCoverage2D gc) {
-        //get the resolution
-        AffineTransform gridToCRS = (AffineTransform) gc.getGridGeometry().getGridToCRS2D();
-        int[] scale = {(int) Math.round(gridToCRS.getScaleX()), (int) Math.round(gridToCRS.getScaleY())};
-        return scale;
+    private int[] operate(int operation, int[] one, int[] two)
+            throws UnsupportedOperationException {
+
+        //verify lengths
+        if (one.length == two.length) {
+
+            //for output
+            int[] out = new int[0];
+
+            //apply the required operation
+            switch (operation) {
+                case 1:
+                    out = opAdd(one, two);
+                    break;
+                case 2:
+                    out = opSubtract(one, two);
+                    break;
+                case 3:
+                    out = opMultiply(one, two);
+                    break;
+                case 4:
+                    out = opDivide(one, two);
+                    break;
+                default:
+                    throw new UnsupportedOperationException("RasterCalculator does not currently support that operation");
+            }
+            return out;
+        } else {
+            throw new ArrayIndexOutOfBoundsException("Arrays used in operation must be the same size!");
+        }
+    }
+
+    /**
+     * Operation for Addition
+     *
+     * @param one
+     * @param two
+     * @return
+     */
+    private int[] opAdd(int[] one, int[] two) {
+        int[] out = new int[0];
+        for (int i = 0; i < one.length; i++) {
+            out[i] = one[i] + two[i];
+        }
+        return out;
+    }
+
+    /**
+     * Operation for Subtraction
+     *
+     * @param one
+     * @param two
+     * @return
+     */
+    private int[] opSubtract(int[] one, int[] two) {
+        int[] out = new int[0];
+        for (int i = 0; i < one.length; i++) {
+            out[i] = one[i] - two[i];
+        }
+        return out;
+    }
+
+    /**
+     * Operation for Multiplication
+     *
+     * @param one
+     * @param two
+     * @return
+     */
+    private int[] opMultiply(int[] one, int[] two) {
+        int[] out = new int[0];
+        for (int i = 0; i < one.length; i++) {
+            out[i] = one[i] * two[i];
+        }
+        return out;
+    }
+
+    /**
+     * Operation for Division
+     *
+     * @param one
+     * @param two
+     * @return
+     */
+    private int[] opDivide(int[] one, int[] two) {
+        int[] out = new int[0];
+        for (int i = 0; i < one.length; i++) {
+            out[i] = one[i] / two[i];
+        }
+        return out;
     }
 }

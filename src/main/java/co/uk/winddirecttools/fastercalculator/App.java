@@ -76,31 +76,22 @@ public class App {
             final Hints hint = new Hints();
             hint.put(Hints.DEFAULT_COORDINATE_REFERENCE_SYSTEM, crs);
 
-            //get first File
-            File firstFile = filesToProcess.remove(0);
-            System.out.println("processing..." + firstFile.getName());
-
-            //open the raster layer
-            AbstractGridFormat format = GridFormatFinder.findFormat(firstFile);
-            AbstractGridCoverage2DReader reader1 = format.getReader(firstFile, hint);
-            GridCoverage2D gc1 = (GridCoverage2D) reader1.read(null);
-
-            //combine the layers
+            //read all input laters into ArrayList
+            ArrayList<GridCoverage2D> coverages = new  ArrayList<GridCoverage2D>();
             for (File file : filesToProcess) {
 
                 //read the next file
-                System.out.println("processing..." + file.getName());
-                format = GridFormatFinder.findFormat(file);
-                AbstractGridCoverage2DReader reader2 = format.getReader(file, hint);
-                GridCoverage2D gc2 = (GridCoverage2D) reader2.read(null);
-
-                //combine
-                RasterCalculator rc = new RasterCalculator();
-                gc1 = rc.process(gc1, 20000d, gc2, 20000d, RasterCalculator.ADD);
+                AbstractGridFormat format = GridFormatFinder.findFormat(file);
+                AbstractGridCoverage2DReader reader = format.getReader(file, hint);
+                coverages.add((GridCoverage2D) reader.read(null));
             }
+            
+            //build raster calculator
+            RasterCalculator rc = new RasterCalculator();
+            GridCoverage2D gc = rc.process(coverages, RasterCalculator.ADD);
 
             //write result
-            writeGeoTiffFile(gc1, outPath);
+            writeGeoTiffFile(gc, outPath);
             System.out.println("Done!");
 
         } catch (InvalidGridGeometryException ex) {
