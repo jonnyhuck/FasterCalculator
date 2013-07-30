@@ -2,21 +2,16 @@ package co.uk.winddirecttools.fastercalculator;
 
 import java.awt.geom.AffineTransform;
 import java.awt.image.DataBuffer;
-import java.awt.image.RenderedImage;
+import java.awt.image.Raster;
 import java.awt.image.WritableRaster;
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import javax.media.jai.RasterFactory;
-import javax.media.jai.iterator.RectIter;
-import javax.media.jai.iterator.RectIterFactory;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.grid.InvalidGridGeometryException;
-import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.Envelope2D;
 import org.opengis.referencing.FactoryException;
@@ -187,25 +182,13 @@ public class RasterCalculator {
 
             //get values from coverage
             int gcValues[] = this.getValuesFromGridCoverage(coverage);
-            /*try {
-                this.writeOutData(gcValues, coverageEnvelope, "C:\\Users\\jonathan.huck\\Documents\\_coverageValues.tif");
-            } catch (Exception ex) {
-            }//*/
 
             //get values from raster
             int rasterValues[] = new int[w * h];
             raster.getSamples((int) gridTLCoord.getX(), (int) gridTLCoord.getY(), w, h, 0, rasterValues);
-            /*try {
-             this.writeOutData(rasterValues, coverageEnvelope, "C:\\Users\\jonathan.huck\\Documents\\_rasterValues.tif");
-             } catch (Exception ex) {
-             }//*/
 
             //calculate output values
             int outputValues[] = this.operate(operation, gcValues, rasterValues);
-            /*try {
-             this.writeOutData(rasterValues, coverageEnvelope, "C:\\Users\\jonathan.huck\\Documents\\_outputValues.tif");
-             } catch (Exception ex) {
-             }//*/
 
             //apply to the raster
             raster.setSamples((int) gridTLCoord.getX(), (int) gridTLCoord.getY(), w, h, 0, outputValues);
@@ -232,27 +215,14 @@ public class RasterCalculator {
      */
     private int[] getValuesFromGridCoverage(GridCoverage2D gc) {
 
-        //get image and iterator
-        final RenderedImage img = gc.getRenderedImage();
-        final RectIter iter = RectIterFactory.create(img, null);
-
-        //holder for data
-        int[] list = new int[gc.getGridGeometry().getGridRange2D().height
-                * gc.getGridGeometry().getGridRange2D().width];
-
-        //get data from each row & column
-        int i = 0;
-        //start at top line and loop through all lines
-        iter.startLines();
-        while (!iter.nextLineDone()) {
-            //back to left-most pixel and loop through all pixels
-            iter.startPixels();
-            while (!iter.nextPixelDone()) {
-                //get value and increment counter
-                list[i] = iter.getSample(0);
-                i++;
-            }
-        }
+        //get dimensions and data holder
+        final int w = gc.getGridGeometry().getGridRange2D().width;
+        final int h = gc.getGridGeometry().getGridRange2D().height;
+        int[] list = new int[w*h];
+        
+        //get image, raster, then raw data
+        final Raster raster = gc.getRenderedImage().getData();
+        raster.getSamples(0, 0, w, h, 0, list);
         return list;
     }
 
@@ -357,60 +327,5 @@ public class RasterCalculator {
             out[i] = one[i] / two[i];
         }
         return out;
-    }
-
-    /**
-     * FOR TESTING ONLY
-     *
-     * @param data
-     * @param envelope
-     * @param path
-     * @throws IOException
-     * @throws NoSuchAuthorityCodeException
-     * @throws FactoryException
-     */
-    private void writeOutData(int[] data, Envelope2D envelope, String path)
-            throws IOException, NoSuchAuthorityCodeException, FactoryException {
-
-        //create a geotiff writer
-        File file = new File(path);
-        GeoTiffWriter gw = new GeoTiffWriter(file);
-        try {
-            //write the file
-            WritableRaster r = this.getWritableRaster(envelope, 50d, 0d);
-            r.setSamples(0, 0, r.getWidth(), r.getHeight(), 0, data);
-            GridCoverageFactory factory = new GridCoverageFactory();
-            GridCoverage2D gc = factory.create("output", r, envelope);
-            gw.write(gc, null);
-        } finally {
-            //destroy the writer
-            gw.dispose();
-        }
-    }
-
-    /**
-     * Reads in and out a coverage for testing purposes
-     * @param gc 
-     */
-    public void test(GridCoverage2D gc) {
-        int[] data = this.getValuesFromGridCoverage(gc);
-
-        int zero = 0;
-        int one = 0;
-        for (int i = 0; i < data.length; i++) {
-            if (data[i] == 0) {
-                zero++;
-            } else if (data[i] == 1) {
-                one++;
-            }//
-        }
-        System.out.println(zero);
-        System.out.println(one);
-
-        try {
-            this.writeOutData(data, gc.getEnvelope2D(),
-                    "C:\\Users\\jonathan.huck\\Documents\\_bigtest.tif");
-        } catch (Exception e) {
-        }
     }
 }

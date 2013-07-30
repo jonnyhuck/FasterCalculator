@@ -76,15 +76,6 @@ public class App {
             final Hints hint = new Hints();
             hint.put(Hints.DEFAULT_COORDINATE_REFERENCE_SYSTEM, crs);
 
-            /*//TEST
-             File file = new File("C:\\Users\\jonathan.huck\\Documents\\_test\\Bournmouth_77m.asc");
-             AbstractGridFormat format = GridFormatFinder.findFormat(file);
-             AbstractGridCoverage2DReader reader = format.getReader(file, hint);
-             GridCoverage2D gc = (GridCoverage2D) reader.read(null);
-             RasterCalculator rc = new RasterCalculator();
-             rc.test(gc);
-             /*TEST*/
-
             //read all input laters into ArrayList
             ArrayList<GridCoverage2D> coverages = new ArrayList<GridCoverage2D>();
             for (File file : filesToProcess) {
@@ -107,7 +98,7 @@ public class App {
             Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
         } catch (TransformException ex) {
             Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException ex) { //*/
             Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
             Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
