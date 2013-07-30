@@ -4,15 +4,19 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.DataBuffer;
 import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import javax.media.jai.RasterFactory;
 import javax.media.jai.iterator.RectIter;
 import javax.media.jai.iterator.RectIterFactory;
+import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.grid.InvalidGridGeometryException;
+import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.Envelope2D;
 import org.opengis.referencing.FactoryException;
@@ -95,7 +99,7 @@ public class RasterCalculator {
             int resolution, CoordinateReferenceSystem crs) {
 
         //get first coverage and set initial dimensions
-        GridCoverage2D gc = coverages.remove(0);
+        GridCoverage2D gc = coverages.get(0);
 
         //get corners
         double maxX = gc.getEnvelope2D().getMaxX();
@@ -109,7 +113,6 @@ public class RasterCalculator {
             maxY = Math.max(maxY, coverage.getEnvelope2D().getMaxY());
             minX = Math.min(minX, coverage.getEnvelope2D().getMinX());
             minY = Math.min(minY, coverage.getEnvelope2D().getMinY());
-            coverage.dispose(true); //clean up
         }
 
         //get anchor points (aligns to grid by buffering outwards)
@@ -119,9 +122,6 @@ public class RasterCalculator {
         final DirectPosition2D tr = new DirectPosition2D(crs,
                 Math.ceil(maxX / resolution) * resolution,
                 Math.ceil(maxY / resolution) * resolution);
-
-        //clean up
-        gc.dispose(true);
 
         //build new envelope
         return new Envelope2D(bl, tr);
@@ -166,48 +166,49 @@ public class RasterCalculator {
      * @throws NoSuchAuthorityCodeException
      * @throws FactoryException
      */
-    private WritableRaster applyRasterValues(
-            ArrayList<GridCoverage2D> coverages,
-            WritableRaster raster,
-            GridCoverage2D tmpGc,
-            int operation)
-            throws InvalidGridGeometryException, TransformException,
-            NoSuchAuthorityCodeException, FactoryException {
+    private WritableRaster applyRasterValues(ArrayList<GridCoverage2D> coverages,
+            WritableRaster raster, GridCoverage2D tmpGc, int operation) throws TransformException {
 
         //details required for converting coordinates to grid positions on the output raster
         final GridGeometry2D rasterGrid = tmpGc.getGridGeometry();
-
-        System.out.println(rasterGrid.getGridRange2D().getMinX());
-        System.out.println(rasterGrid.getGridRange2D().getMaxX());
-        System.out.println(rasterGrid.getGridRange2D().getMinY());
-        System.out.println(rasterGrid.getGridRange2D().getMaxY());
 
         //loop through each coverage and add to raster
         for (GridCoverage2D coverage : coverages) {
 
             //get the grid values for the coverage
-            final Envelope2D coverageEnvelope = coverage.getEnvelope2D();
-            final GridEnvelope2D coverageGridEnvelope = rasterGrid.worldToGrid(coverageEnvelope);
+            Envelope2D coverageEnvelope = coverage.getEnvelope2D();
+            GridEnvelope2D gridEnvelope = coverage.getGridGeometry().getGridRange2D();
 
-            System.out.println("**");
-            System.out.println(coverageGridEnvelope.getMinX());
-            System.out.println(coverageGridEnvelope.getMaxX());
-            System.out.println(coverageGridEnvelope.getMinY());
-            System.out.println(coverageGridEnvelope.getMaxY());
+            GridCoordinates2D gridTLCoord = rasterGrid.worldToGrid(
+                    new DirectPosition2D(rasterGrid.getCoordinateReferenceSystem(),
+                    coverageEnvelope.getMinX(), coverageEnvelope.getMaxY()));
+            int w = gridEnvelope.width;
+            int h = gridEnvelope.height;
 
             //get values from coverage
-            final int gcValues[] = this.getValuesFromGridCoverage(coverage);
+            int gcValues[] = this.getValuesFromGridCoverage(coverage);
+            /*try {
+                this.writeOutData(gcValues, coverageEnvelope, "C:\\Users\\jonathan.huck\\Documents\\_coverageValues.tif");
+            } catch (Exception ex) {
+            }//*/
 
             //get values from raster
-            int rasterValues[] = new int[(int) coverageGridEnvelope.getWidth() * (int) coverageGridEnvelope.getHeight()];
-            raster.getSamples((int) coverageGridEnvelope.getMinX(), (int) coverageGridEnvelope.getMaxY(),
-                    (int) coverageGridEnvelope.getWidth(), (int) coverageGridEnvelope.getHeight(), 0, rasterValues);
+            int rasterValues[] = new int[w * h];
+            raster.getSamples((int) gridTLCoord.getX(), (int) gridTLCoord.getY(), w, h, 0, rasterValues);
+            /*try {
+             this.writeOutData(rasterValues, coverageEnvelope, "C:\\Users\\jonathan.huck\\Documents\\_rasterValues.tif");
+             } catch (Exception ex) {
+             }//*/
 
-            final int values[] = this.operate(operation, gcValues, rasterValues);
+            //calculate output values
+            int outputValues[] = this.operate(operation, gcValues, rasterValues);
+            /*try {
+             this.writeOutData(rasterValues, coverageEnvelope, "C:\\Users\\jonathan.huck\\Documents\\_outputValues.tif");
+             } catch (Exception ex) {
+             }//*/
 
             //apply to the raster
-            raster.setSamples((int) coverageGridEnvelope.getMinX(), (int) coverageGridEnvelope.getMaxY(),
-                    coverageGridEnvelope.width, coverageGridEnvelope.height, 0, values);
+            raster.setSamples((int) gridTLCoord.getX(), (int) gridTLCoord.getY(), w, h, 0, outputValues);
 
             //destroy coverage
             coverage.dispose(true);
@@ -241,8 +242,13 @@ public class RasterCalculator {
 
         //get data from each row & column
         int i = 0;
+        //start at top line and loop through all lines
+        iter.startLines();
         while (!iter.nextLineDone()) {
+            //back to left-most pixel and loop through all pixels
+            iter.startPixels();
             while (!iter.nextPixelDone()) {
+                //get value and increment counter
                 list[i] = iter.getSample(0);
                 i++;
             }
@@ -351,5 +357,60 @@ public class RasterCalculator {
             out[i] = one[i] / two[i];
         }
         return out;
+    }
+
+    /**
+     * FOR TESTING ONLY
+     *
+     * @param data
+     * @param envelope
+     * @param path
+     * @throws IOException
+     * @throws NoSuchAuthorityCodeException
+     * @throws FactoryException
+     */
+    private void writeOutData(int[] data, Envelope2D envelope, String path)
+            throws IOException, NoSuchAuthorityCodeException, FactoryException {
+
+        //create a geotiff writer
+        File file = new File(path);
+        GeoTiffWriter gw = new GeoTiffWriter(file);
+        try {
+            //write the file
+            WritableRaster r = this.getWritableRaster(envelope, 50d, 0d);
+            r.setSamples(0, 0, r.getWidth(), r.getHeight(), 0, data);
+            GridCoverageFactory factory = new GridCoverageFactory();
+            GridCoverage2D gc = factory.create("output", r, envelope);
+            gw.write(gc, null);
+        } finally {
+            //destroy the writer
+            gw.dispose();
+        }
+    }
+
+    /**
+     * Reads in and out a coverage for testing purposes
+     * @param gc 
+     */
+    public void test(GridCoverage2D gc) {
+        int[] data = this.getValuesFromGridCoverage(gc);
+
+        int zero = 0;
+        int one = 0;
+        for (int i = 0; i < data.length; i++) {
+            if (data[i] == 0) {
+                zero++;
+            } else if (data[i] == 1) {
+                one++;
+            }//
+        }
+        System.out.println(zero);
+        System.out.println(one);
+
+        try {
+            this.writeOutData(data, gc.getEnvelope2D(),
+                    "C:\\Users\\jonathan.huck\\Documents\\_bigtest.tif");
+        } catch (Exception e) {
+        }
     }
 }
