@@ -88,7 +88,7 @@ public class App {
 
             //build raster calculator
             RasterCalculator rc = new RasterCalculator();
-            GridCoverage2D gc = rc.process(coverages, RasterCalculator.ADD);
+            GridCoverage2D gc = rc.process(coverages, 20000, RasterCalculator.ADD);
 
             //write result
             writeGeoTiffFile(gc, outPath);  //*/
