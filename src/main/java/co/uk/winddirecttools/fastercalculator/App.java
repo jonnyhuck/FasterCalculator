@@ -65,8 +65,11 @@ public class App {
                 //get out file and verify
                 File outFile = new File(args[2]);
                 if (Files.notExists(outFile.getParentFile().toPath())) {
-                    System.err.println("Argument 2 must be a *.tif file in a valid directory");
-                    System.exit(1);
+                    String filePath = outFile.getPath();
+                    if (filePath.endsWith(".tif") || filePath.endsWith(".TIF")) {
+                        System.err.println("Argument 2 must be a *.tif file in a valid directory");
+                        System.exit(1);
+                    }
                 }
 
                 //set default crs
@@ -89,7 +92,7 @@ public class App {
                 //write result
                 writeGeoTiffFile(gc, outFile.getAbsolutePath());
                 System.out.println("Done!");
-                
+
             } else {
                 System.out.println("Sorry, I'm a 3 arguments kind of girl");
                 System.out.println("Maybe you need to put some speech-marks around your file-paths...?");
@@ -145,6 +148,22 @@ public class App {
         } finally {
             //destroy the writer
             gw.dispose();
+        }
+    }
+
+    /**
+     * Return the file extension from a file path (very simple and only for the
+     * purposes of above, not a robust transferable method).
+     *
+     * @param path
+     * @return
+     */
+    public static String getFileExtension(String path) {
+        int i = path.lastIndexOf('.');
+        if (i > 0) {
+            return path.substring(i + 1);
+        } else {
+            return "";
         }
     }
 }
