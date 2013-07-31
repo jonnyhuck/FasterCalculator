@@ -42,6 +42,9 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
                                         <Main-Class>co.uk.winddirecttools.fastercalculator.App</Main-Class>
+                                        <Implementation-Vendor>Renewables Direct, Ltd</Implementation-Vendor>
+                                        <Implementation-Title>Faster Calculator</Implementation-Title>
+                                        <Implementation-Version>0.1</Implementation-Version>
                                     </manifestEntries>
                                 </transformer>
                                 <!-- This bit merges the various GeoTools META-INF/services files         -->

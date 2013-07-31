@@ -31,7 +31,7 @@ public class App {
         try {
 
             if (args.length == 3) {
-
+                
                 //get radius (verify number)
                 int radius = 0;
                 try {
@@ -43,11 +43,11 @@ public class App {
 
                 //get in directory and verify
                 File inDirectory = new File(args[1]);
-                if (inDirectory.isDirectory()) {
+                if (!inDirectory.isDirectory()) {
                     System.err.println("Argument 2 must be a valid directory");
                     System.exit(1);
                 }
-
+                
                 //get list of files
                 String fileName;
                 File[] listOfFiles = inDirectory.listFiles();
