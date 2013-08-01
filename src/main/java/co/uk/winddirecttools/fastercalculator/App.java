@@ -24,9 +24,7 @@ import org.geotools.styling.Rule;
 import org.geotools.styling.SLDParser;
 import org.geotools.styling.Style;
 import org.geotools.styling.StyleFactory;
-import org.geotools.styling.StyledLayer;
 import org.geotools.styling.StyledLayerDescriptor;
-import org.geotools.styling.UserLayer;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
@@ -175,21 +173,11 @@ public class App {
             rsh.visit(rs);
             GridCoverage2D gc2 = (GridCoverage2D) rsh.getOutput();
 
-            //write params (what do these even do??)
+            //default write params (what do these even do??)
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             GeoTiffFormat format = new GeoTiffFormat();
             ParameterValueGroup paramWrite = format.getWriteParameters();
             paramWrite.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);
-
-            //set metadata tags (doesn't work...)
-            /*gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_MIN_SAMPLE_VALUE), "0");
-             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_MAX_SAMPLE_VALUE), "2");
-             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_SOFTWARE), "FasterCalculator v0.1, Renewables Direct Ltd");
-             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_COPYRIGHT), "(C) Renewables Direct Ltd, 2013");
-             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_PHOTOMETRIC_INTERPRETATION),
-             Integer.toString(BaselineTIFFTagSet.PHOTOMETRIC_INTERPRETATION_BLACK_IS_ZERO));
-             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_SAMPLE_FORMAT),
-             Integer.toString(BaselineTIFFTagSet.SAMPLE_FORMAT_SIGNED_INTEGER));    //*/
 
             //write the file
             gw.write(gc2, (GeneralParameterValue[]) paramWrite.values().toArray(new GeneralParameterValue[1]));

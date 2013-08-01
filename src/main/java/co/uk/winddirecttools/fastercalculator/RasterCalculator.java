@@ -1,6 +1,5 @@
 package co.uk.winddirecttools.fastercalculator;
 
-import java.awt.Color;
 import java.awt.geom.AffineTransform;
 import java.awt.image.DataBuffer;
 import java.awt.image.Raster;
