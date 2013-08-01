@@ -14,6 +14,7 @@ import org.geotools.factory.Hints;
 import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
+import org.geotools.gce.image.WorldImageWriter;
 import org.geotools.referencing.CRS;
 import org.geotools.renderer.lite.gridcoverage2d.RasterSymbolizerHelper;
 import org.geotools.renderer.lite.gridcoverage2d.SubchainStyleVisitorCoverageProcessingAdapter;
@@ -157,6 +158,7 @@ public class App {
         //create a geotiff writer
         final File file = new File(path);
         GeoTiffWriter gw = new GeoTiffWriter(file);
+        //WorldImageWriter gw = new WorldImageWriter(file);
         try {
 
             //apply style to the GridCoverage2D
@@ -173,7 +175,7 @@ public class App {
             rsh.visit(rs);
             GridCoverage2D gc2 = (GridCoverage2D) rsh.getOutput();
 
-            //default write params (what do these even do??)
+            //default write params
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             GeoTiffFormat format = new GeoTiffFormat();
             ParameterValueGroup paramWrite = format.getWriteParameters();
