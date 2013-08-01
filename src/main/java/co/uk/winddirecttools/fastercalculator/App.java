@@ -9,9 +9,26 @@ import org.geotools.coverage.grid.InvalidGridGeometryException;
 import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.coverage.grid.io.GridFormatFinder;
+import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.factory.Hints;
+import org.geotools.gce.geotiff.GeoTiffFormat;
+import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.referencing.CRS;
+import org.geotools.renderer.lite.gridcoverage2d.RasterSymbolizerHelper;
+import org.geotools.renderer.lite.gridcoverage2d.SubchainStyleVisitorCoverageProcessingAdapter;
+import org.geotools.styling.FeatureTypeStyle;
+import org.geotools.styling.NamedLayer;
+import org.geotools.styling.RasterSymbolizer;
+import org.geotools.styling.Rule;
+import org.geotools.styling.SLDParser;
+import org.geotools.styling.Style;
+import org.geotools.styling.StyleFactory;
+import org.geotools.styling.StyledLayer;
+import org.geotools.styling.StyledLayerDescriptor;
+import org.geotools.styling.UserLayer;
+import org.opengis.parameter.GeneralParameterValue;
+import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
@@ -31,7 +48,7 @@ public class App {
         try {
 
             if (args.length == 3) {
-                
+
                 //get radius (verify number)
                 int radius = 0;
                 try {
@@ -47,7 +64,7 @@ public class App {
                     System.err.println("Argument 2 must be a valid directory");
                     System.exit(1);
                 }
-                
+
                 //get list of files
                 String fileName;
                 File[] listOfFiles = inDirectory.listFiles();
@@ -140,11 +157,46 @@ public class App {
             throws IOException {
 
         //create a geotiff writer
-        File file = new File(path);
+        final File file = new File(path);
         GeoTiffWriter gw = new GeoTiffWriter(file);
         try {
+
+            //apply style to the GridCoverage2D
+            StyleFactory styleFactory = CommonFactoryFinder.getStyleFactory(null);
+            File sldFile = new File("C:\\Users\\jonathan.huck\\Desktop\\fc.sld");
+            SLDParser stylereader = new SLDParser(styleFactory, sldFile.toURI().toURL());
+            StyledLayerDescriptor sld = stylereader.parseSLD();
+            SubchainStyleVisitorCoverageProcessingAdapter rsh = new RasterSymbolizerHelper(gc, null);
+            final NamedLayer ul = (NamedLayer) sld.getStyledLayers()[0];
+            final Style style = ul.getStyles()[0]; //ul.getUserStyles()[0];
+            final FeatureTypeStyle fts = (FeatureTypeStyle) style.featureTypeStyles().toArray()[0];
+            final Rule rule = (Rule) fts.rules().toArray()[0];
+            RasterSymbolizer rs = (RasterSymbolizer) rule.getSymbolizers()[0];
+            rsh.visit(rs);
+            GridCoverage2D gc2 = (GridCoverage2D) rsh.getOutput();
+
+            //write params (what do these even do??)
+            GeoTiffWriteParams wp = new GeoTiffWriteParams();
+            GeoTiffFormat format = new GeoTiffFormat();
+            ParameterValueGroup paramWrite = format.getWriteParameters();
+            paramWrite.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);
+
+            //set metadata tags (doesn't work...)
+            /*gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_MIN_SAMPLE_VALUE), "0");
+             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_MAX_SAMPLE_VALUE), "2");
+             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_SOFTWARE), "FasterCalculator v0.1, Renewables Direct Ltd");
+             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_COPYRIGHT), "(C) Renewables Direct Ltd, 2013");
+             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_PHOTOMETRIC_INTERPRETATION),
+             Integer.toString(BaselineTIFFTagSet.PHOTOMETRIC_INTERPRETATION_BLACK_IS_ZERO));
+             gw.setMetadataValue(Integer.toString(BaselineTIFFTagSet.TAG_SAMPLE_FORMAT),
+             Integer.toString(BaselineTIFFTagSet.SAMPLE_FORMAT_SIGNED_INTEGER));    //*/
+
             //write the file
-            gw.write(gc, null);
+            gw.write(gc2, (GeneralParameterValue[]) paramWrite.values().toArray(new GeneralParameterValue[1]));
+            //gw.write(gc2, null);
+
+        } catch (IOException e) {
+            throw new IOException();
         } finally {
             //destroy the writer
             gw.dispose();
