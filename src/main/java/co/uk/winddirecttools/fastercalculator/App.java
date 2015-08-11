@@ -157,8 +157,8 @@ public class App {
 
         //create a geotiff writer
         final File file = new File(path);
-        GeoTiffWriter gw = new GeoTiffWriter(file);
-        //WorldImageWriter gw = new WorldImageWriter(file);
+        //GeoTiffWriter gw = new GeoTiffWriter(file);
+        WorldImageWriter gw = new WorldImageWriter(file);
         try {
 
             //apply style to the GridCoverage2D
@@ -176,14 +176,14 @@ public class App {
             GridCoverage2D gc2 = (GridCoverage2D) rsh.getOutput();
 
             //default write params
-            GeoTiffWriteParams wp = new GeoTiffWriteParams();
+            /*GeoTiffWriteParams wp = new GeoTiffWriteParams();
             GeoTiffFormat format = new GeoTiffFormat();
             ParameterValueGroup paramWrite = format.getWriteParameters();
-            paramWrite.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);
+            paramWrite.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);   //*/
 
             //write the file
-            gw.write(gc2, (GeneralParameterValue[]) paramWrite.values().toArray(new GeneralParameterValue[1]));
-            //gw.write(gc2, null);
+            //gw.write(gc2, (GeneralParameterValue[]) paramWrite.values().toArray(new GeneralParameterValue[1]));
+            gw.write(gc2, null);
 
         } catch (IOException e) {
             throw new IOException();
