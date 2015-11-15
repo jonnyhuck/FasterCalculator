@@ -11,10 +11,10 @@ import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.coverage.grid.io.GridFormatFinder;
 import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.factory.Hints;
-import org.geotools.gce.geotiff.GeoTiffFormat;
-import org.geotools.gce.geotiff.GeoTiffWriteParams;
+//import org.geotools.gce.geotiff.GeoTiffFormat;
+//import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
-import org.geotools.gce.image.WorldImageWriter;
+//import org.geotools.gce.image.WorldImageWriter;
 import org.geotools.referencing.CRS;
 import org.geotools.renderer.lite.gridcoverage2d.RasterSymbolizerHelper;
 import org.geotools.renderer.lite.gridcoverage2d.SubchainStyleVisitorCoverageProcessingAdapter;
@@ -94,10 +94,14 @@ public class App {
                 hint.put(Hints.DEFAULT_COORDINATE_REFERENCE_SYSTEM, crs);
 
                 //read all input layers into an ArrayList of GridCoverage2D's
+                //ToDo: This has GOT to be inefficient - we should be doing this on the fly populating a single variable rather than storing an array 
                 ArrayList<GridCoverage2D> coverages = new ArrayList<GridCoverage2D>();
+                AbstractGridCoverage2DReader reader;
+                AbstractGridFormat format;
                 for (File file : filesToProcess) {
-                    AbstractGridFormat format = GridFormatFinder.findFormat(file);
-                    AbstractGridCoverage2DReader reader = format.getReader(file, hint);
+                    format = GridFormatFinder.findFormat(file);
+//                    System.out.println(file.getName());
+                    reader = format.getReader(file, hint);
                     coverages.add((GridCoverage2D) reader.read(null));
                 }
 
@@ -106,6 +110,7 @@ public class App {
                 GridCoverage2D gc = rc.process(coverages, radius, RasterCalculator.ADD);
 
                 //write result
+                System.out.println(outFile.getAbsolutePath());
                 writeGeoTiffFile(gc, outFile.getAbsolutePath());
                 System.out.println("Done!");
 
@@ -118,29 +123,35 @@ public class App {
             }
 
         } catch (InvalidGridGeometryException ex) {
-            System.err.println("How embarassing...");
+            System.err.println("How embarassing1...");
             System.err.println(ex.toString());
             System.exit(1);
+//            ex.printStackTrace();
         } catch (TransformException ex) {
             System.err.println("How embarassing...");
             System.err.println(ex.toString());
             System.exit(1);
+//            ex.printStackTrace();
         } catch (IllegalArgumentException ex) {
             System.err.println("How embarassing...");
             System.err.println(ex.toString());
+//            ex.printStackTrace();
             System.exit(1);
         } catch (IOException ex) {
             System.err.println("How embarassing...");
             System.err.println(ex.toString());
+//            ex.printStackTrace();
             System.exit(1);
         } catch (NoSuchAuthorityCodeException ex) {
             System.err.println("How embarassing...");
             System.err.println(ex.toString());
+//            ex.printStackTrace();
             System.exit(1);
         } catch (FactoryException ex) {
             System.err.println("How embarassing...");
             System.err.println(ex.toString());
             System.exit(1);
+//            ex.printStackTrace();
         }
 
     }
@@ -157,13 +168,13 @@ public class App {
 
         //create a geotiff writer
         final File file = new File(path);
-        //GeoTiffWriter gw = new GeoTiffWriter(file);
-        WorldImageWriter gw = new WorldImageWriter(file);
+        GeoTiffWriter gw = new GeoTiffWriter(file);
+        //WorldImageWriter gw = new WorldImageWriter(file);
         try {
 
-            //apply style to the GridCoverage2D
+            //apply style to the GridCoverage2D and write to file
             StyleFactory styleFactory = CommonFactoryFinder.getStyleFactory(null);
-            File sldFile = new File("C:\\Users\\jonathan.huck\\Desktop\\fc.sld");
+            File sldFile = new File("/Users/jonnyhuck/Dropbox/PhD/Viewshed/Python/fc.sld");
             SLDParser stylereader = new SLDParser(styleFactory, sldFile.toURI().toURL());
             StyledLayerDescriptor sld = stylereader.parseSLD();
             SubchainStyleVisitorCoverageProcessingAdapter rsh = new RasterSymbolizerHelper(gc, null);
@@ -174,16 +185,14 @@ public class App {
             RasterSymbolizer rs = (RasterSymbolizer) rule.getSymbolizers()[0];
             rsh.visit(rs);
             GridCoverage2D gc2 = (GridCoverage2D) rsh.getOutput();
-
-            //default write params
-            /*GeoTiffWriteParams wp = new GeoTiffWriteParams();
-            GeoTiffFormat format = new GeoTiffFormat();
-            ParameterValueGroup paramWrite = format.getWriteParameters();
-            paramWrite.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);   //*/
-
-            //write the file
-            //gw.write(gc2, (GeneralParameterValue[]) paramWrite.values().toArray(new GeneralParameterValue[1]));
-            gw.write(gc2, null);
+            gw.write(gc2, null);            
+            
+            //write out the raw data instead
+//            GeoTiffWriteParams wp = new GeoTiffWriteParams();
+//            GeoTiffFormat format = new GeoTiffFormat();
+//            ParameterValueGroup paramWrite = format.getWriteParameters();
+//            paramWrite.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);          
+//            gw.write(gc, (GeneralParameterValue[]) paramWrite.values().toArray(new GeneralParameterValue[1]));
 
         } catch (IOException e) {
             throw new IOException();
@@ -209,23 +218,3 @@ public class App {
         }
     }
 }
-/*/get input directory path
- String inPath;
- JFileChooser inChooser = new JFileChooser();
- inChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
- int inReturnVal = inChooser.showOpenDialog(inChooser);
- if (inReturnVal == JFileChooser.APPROVE_OPTION) {
- inPath = inChooser.getSelectedFile().getAbsolutePath();
- } else {
- return;
- }
- //get output file path
- JFileChooser outChooser = new JFileChooser();
- FileNameExtensionFilter filter = new FileNameExtensionFilter("GeoTiff Files", "tif");
- outChooser.setFileFilter(filter);
- int returnVal = outChooser.showSaveDialog(null);
- if (returnVal == JFileChooser.APPROVE_OPTION) {
- outPath = outChooser.getSelectedFile().getAbsolutePath();
- } else {
- return;
- }   //*/

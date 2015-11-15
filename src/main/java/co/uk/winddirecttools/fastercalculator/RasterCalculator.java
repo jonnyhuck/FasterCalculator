@@ -38,7 +38,7 @@ public class RasterCalculator {
      * Returns the combination of the two grid coverages, performing the
      * specified operation upon them and without clipping them to the overlap
      * region
-     * 
+     *
      * @param coverages
      * @param radius
      * @param operation
@@ -46,7 +46,7 @@ public class RasterCalculator {
      * @throws NoSuchAuthorityCodeException
      * @throws FactoryException
      * @throws InvalidGridGeometryException
-     * @throws TransformException 
+     * @throws TransformException
      */
     public GridCoverage2D process(ArrayList<GridCoverage2D> coverages, int radius, int operation)
             throws NoSuchAuthorityCodeException, FactoryException, InvalidGridGeometryException, TransformException {
@@ -88,11 +88,11 @@ public class RasterCalculator {
 
     /**
      * Combine two envelopes into one
-     * 
+     *
      * @param coverages
      * @param resolution
      * @param crs
-     * @return 
+     * @return
      */
     private Envelope2D getCombinedEnvelope(ArrayList<GridCoverage2D> coverages,
             int resolution, CoordinateReferenceSystem crs) {
@@ -128,14 +128,14 @@ public class RasterCalculator {
 
     /**
      * Returns an empty grid coverage upon which to build results
-     * 
+     *
      * @param envelope
      * @param resolution
      * @param initialValue
      * @return
      * @throws NoSuchAuthorityCodeException
      * @throws FactoryException
-     * @throws ResolutionException 
+     * @throws ResolutionException
      */
     private WritableRaster getWritableRaster(Envelope2D envelope, double resolution, double initialValue)
             throws NoSuchAuthorityCodeException, FactoryException, ResolutionException {
@@ -156,51 +156,54 @@ public class RasterCalculator {
 
     /**
      * Adds a set of values from a grid coverage to a writable raster
-     * 
+     *
      * @param coverages
      * @param raster
      * @param tmpGc
      * @param cellRadius
      * @param operation
      * @return
-     * @throws TransformException 
+     * @throws TransformException
      */
     private WritableRaster applyRasterValues(ArrayList<GridCoverage2D> coverages,
-            WritableRaster raster, GridCoverage2D tmpGc, double cellRadius, int operation) 
+            WritableRaster raster, GridCoverage2D tmpGc, double cellRadius, int operation)
             throws TransformException {
 
         //details required for converting coordinates to grid positions on the output raster
         final GridGeometry2D rasterGrid = tmpGc.getGridGeometry();
 
         //loop through each coverage and add to raster
+        Envelope2D coverageEnvelope;
+        GridEnvelope2D gridEnvelope;
+        GridCoordinates2D gridTLCoord;
         for (GridCoverage2D coverage : coverages) {
 
             //get the grid values for the coverage
-            Envelope2D coverageEnvelope = coverage.getEnvelope2D();
-            GridEnvelope2D gridEnvelope = coverage.getGridGeometry().getGridRange2D();
+            coverageEnvelope = coverage.getEnvelope2D();
+            gridEnvelope = coverage.getGridGeometry().getGridRange2D();
 
-            GridCoordinates2D gridTLCoord = rasterGrid.worldToGrid(
+            gridTLCoord = rasterGrid.worldToGrid(
                     new DirectPosition2D(rasterGrid.getCoordinateReferenceSystem(),
-                    coverageEnvelope.getMinX(), coverageEnvelope.getMaxY()));
+                            coverageEnvelope.getMinX(), coverageEnvelope.getMaxY()));
             int w = gridEnvelope.width;
             int h = gridEnvelope.height;
 
             //get values from coverage
             int gcValues[] = this.getValuesFromGridCoverage(coverage);
-            
+
             //enforce radius if needed
             gcValues = this.enforceRadius(gcValues, gridEnvelope, cellRadius, 0);
 
             //get values from raster
             int rasterValues[] = new int[w * h];
-            raster.getSamples((int) gridTLCoord.getX(), (int) gridTLCoord.getY(), 
+            raster.getSamples((int) gridTLCoord.getX(), (int) gridTLCoord.getY(),
                     w, h, 0, rasterValues);
 
             //calculate output values
             int outputValues[] = this.operate(operation, gcValues, rasterValues);
 
             //apply to the raster
-            raster.setSamples((int) gridTLCoord.getX(), (int) gridTLCoord.getY(), 
+            raster.setSamples((int) gridTLCoord.getX(), (int) gridTLCoord.getY(),
                     w, h, 0, outputValues);
 
             //destroy coverage
@@ -216,48 +219,50 @@ public class RasterCalculator {
 
     /**
      * Returns a value from a grid coverage
-     * 
+     *
      * @param gc
-     * @return 
+     * @return
      */
     private int[] getValuesFromGridCoverage(GridCoverage2D gc) {
 
         //get dimensions and data holder
         final int w = gc.getGridGeometry().getGridRange2D().width;
         final int h = gc.getGridGeometry().getGridRange2D().height;
-        int[] list = new int[w*h];
-        
+        int[] list = new int[w * h];
+
         //get image, raster, then raw data
         final Raster raster = gc.getRenderedImage().getData();
         raster.getSamples(0, 0, w, h, 0, list);
         return list;
     }
-    
+
     /**
-     * Replace values in a 1D data array outside a certain radius from the centre
-     * 
+     * Replace values in a 1D data array outside a certain radius from the
+     * centre
+     *
      * @param data
      * @param gridEnvelope
      * @param radius
      * @param replacementValue
-     * @return 
+     * @return
      */
-    private int[] enforceRadius(int[] data,  GridEnvelope2D gridEnvelope, 
+    private int[] enforceRadius(int[] data, GridEnvelope2D gridEnvelope,
             double radius, int replacementValue) {
-        
+
         //to hold output
         int[] out = new int[data.length];
-        
+
         //get centroid grid coordinates
         int centreX = (data.length / 2) % gridEnvelope.width;
         int centreY = (int) (data.length / 2) / gridEnvelope.width;
-        
+
         //loop through and determine distance
+        int x, y;
         for (int i = 0; i < data.length; i++) {
-            int x = (i % gridEnvelope.width) - centreX;
-            int y = ((int) i  / gridEnvelope.width) - centreY;
-            out[i] = (Math.sqrt(Math.pow(x, 2d) + Math.pow(y, 2d)) < radius) ? 
-                    data[i] : replacementValue;
+            x = (i % gridEnvelope.width) - centreX;
+            y = ((int) i / gridEnvelope.width) - centreY;
+            out[i] = (Math.sqrt(Math.pow(x, 2d) + Math.pow(y, 2d)) < radius)
+                    ? data[i] : replacementValue;
         }
         return out;
     }
@@ -273,7 +278,7 @@ public class RasterCalculator {
      */
     private int[] operate(int operation, int[] one, int[] two)
             throws UnsupportedOperationException {
-        
+
         //verify lengths
         if (one.length == two.length) {
 

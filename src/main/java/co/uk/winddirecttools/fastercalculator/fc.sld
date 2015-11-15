@@ -14,8 +14,8 @@
           <RasterSymbolizer>
             <ColorMap>
 		<ColorMapEntry color="#FFFFFF" quantity="0" opacity="0"/>
-	      	<ColorMapEntry color="#8DD3C7" quantity="1"/>
-              	<ColorMapEntry color="#FFFFB3" quantity="2"/>
+	    <ColorMapEntry color="#8DD3C7" quantity="1"/>
+        <ColorMapEntry color="#FFFFB3" quantity="2"/>
 		<ColorMapEntry color="#FB8072" quantity="3"/>
 		<ColorMapEntry color="#80B1D3" quantity="4"/>
 		<ColorMapEntry color="#FDB462" quantity="5"/>
