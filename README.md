@@ -7,7 +7,8 @@ Called from the command line:
 
 Whilst it works, there is a lot of work to do in terms of user-friendliness, so watch this space!
 
-###TODO
+### TODO
+
 * Improve memory efficienty by getting rid of the ArrayList of GridCoverage2D's, instead just keep re-populating a single variable in a loop.
 * Rename [radius] - it is actually diameter, so needs to be twice the radius of the Viewshed at any rate.
 * Get rid of the requirement for [radius], this is inherited from this project's origins for combining Viewsheds and is unneccessary - just work out the width of a file in m.
